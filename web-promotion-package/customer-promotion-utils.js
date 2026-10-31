@@ -15,8 +15,8 @@ export function isPromotionApplicable(promotion, serviceId, appointmentDateTime)
   const allowedServices = (promotion.service_ids || []).map(String);
   if (!allowedServices.includes(String(serviceId))) return false;
 
-  const localWhen = new Date(when.toLocaleString("en-US", { timeZone: "America/Merida" }));
-  const weekday = localWhen.getDay();
+  const zonedParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Merida", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(when);\n  const parts = Object.fromEntries(zonedParts.map(part => [part.type, part.value]));\n  const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const weekday = weekdayMap[parts.weekday];
   if (Array.isArray(promotion.weekdays) && promotion.weekdays.length &&
       !promotion.weekdays.map(Number).includes(weekday)) return false;
 
@@ -25,7 +25,7 @@ export function isPromotionApplicable(promotion, serviceId, appointmentDateTime)
     if (!promotion.start_time || !promotion.end_time) return false;
     const start = parseMinutes(promotion.start_time);
     const end = parseMinutes(promotion.end_time);
-    const current = localWhen.getHours() * 60 + localWhen.getMinutes();
+    const current = Number(parts.hour) * 60 + Number(parts.minute);
     if (start == null || end == null || end <= start) return false;
     if (current < start || current >= end) return false;
   }
