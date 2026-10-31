@@ -119,7 +119,7 @@ as $$
   from public.barber_promotions p
   left join public.barber_promotion_services ps on ps.promotion_id = p.id
   where p.status = 'approved'
-    and now() >= p.starts_at and now() < p.ends_at
+    and p.ends_at > now()
     and (p.max_uses is null or p.uses_count < p.max_uses)
   group by p.id
   order by p.starts_at;
