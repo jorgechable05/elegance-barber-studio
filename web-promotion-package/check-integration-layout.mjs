@@ -8,12 +8,12 @@ const pages = [
   {
     file: "web-recovery/admin.html",
     imports: ["./web-promotion-package/admin-promotions.js"],
-    requiredFiles: ["web-recovery/web-promotion-package/admin-promotions.js"],
+    requiredFiles: ["web-promotion-package/admin-promotions.js"],
   },
   {
     file: "web-recovery/cliente.html",
     imports: ["./web-promotion-package/customer-promotion-utils.js"],
-    requiredFiles: ["web-recovery/web-promotion-package/customer-promotion-utils.js"],
+    requiredFiles: ["web-promotion-package/customer-promotion-utils.js"],
   },
 ];
 const errors = [];
