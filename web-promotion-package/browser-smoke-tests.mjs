@@ -247,6 +247,11 @@ function installNetworkStubs(page) {
 }
 
 async function main() {
+  if (useLocalPostgrest) {
+    const upstream = new URL(process.env.PGRST_URL);
+    assert.ok(["127.0.0.1","localhost"].includes(upstream.hostname),
+      "Browser-to-RPC test only permits loopback PostgREST; hosted backends are forbidden");
+  }
   await new Promise((resolveListen, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolveListen);
