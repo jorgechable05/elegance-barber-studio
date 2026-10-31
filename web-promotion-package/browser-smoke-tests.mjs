@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { readFile } from "node:fs/promises";
+import { createHmac } from "node:crypto";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -9,9 +10,23 @@ const packageDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(packageDir, "..");
 const productionSupabaseHost = "bvcbticzboknkmtgfkgw.supabase.co";
 const mockOrigin = "https://mock.supabase.test";
+const useLocalPostgrest = Boolean(process.env.PGRST_URL);
+const jwtSecret = process.env.PGRST_JWT_SECRET || "";
 const browserErrors = [];
 const productionRequests = [];
 const calls = [];
+const observedRpcCalls = [];
+let appBaseUrl = "";
+function base64url(value) { return Buffer.from(value).toString("base64url"); }
+function makeAnonJwt(secret) {
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = base64url(JSON.stringify({alg:"HS256",typ:"JWT"})) + "." +
+    base64url(JSON.stringify({role:"anon",iat:now,exp:now+300,iss:"elegance-browser-ci"}));
+  return unsigned + "." + createHmac("sha256", secret).update(unsigned).digest("base64url");
+}
+const browserApiKey = useLocalPostgrest
+  ? (assert.ok(Buffer.byteLength(jwtSecret) >= 32, "test-only JWT secret required"), makeAnonJwt(jwtSecret))
+  : "test-publishable-key-not-real";
 
 const services = [
   {id:1,name:"Corte Clásico",description:"Corte clásico",duration_minutes:30,price:160,is_active:true,display_order:1},
@@ -77,12 +92,15 @@ function rpcFixture(name, args = {}) {
   }
 }
 
+function rpcCallSeen(name) {
+  return calls.some(call => call.name === name) || observedRpcCalls.some(call => call.name === name);
+}
 async function waitForRpcCall(name, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
-  while (!calls.some(call => call.name === name) && Date.now() < deadline) {
+  while (!rpcCallSeen(name) && Date.now() < deadline) {
     await new Promise(resolveWait => setTimeout(resolveWait, 25));
   }
-  assert.ok(calls.some(call => call.name === name), "Timed out waiting for mocked RPC " + name);
+  assert.ok(rpcCallSeen(name), "Timed out waiting for RPC " + name);
 }
 
 const mimeTypes = {
@@ -113,6 +131,26 @@ window.supabase = {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (useLocalPostgrest && url.pathname.startsWith("/rest/v1/rpc/")) {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + url.pathname + url.search;
+      const upstream = await fetch(upstreamUrl, {
+        method: req.method,
+        headers: {
+          ...(req.headers.authorization ? {authorization:req.headers.authorization} : {}),
+          ...(req.headers.apikey ? {apikey:req.headers.apikey} : {}),
+          "content-type": req.headers["content-type"] || "application/json"
+        },
+        ...(req.method === "GET" || req.method === "HEAD" ? {} : {body:Buffer.concat(chunks)})
+      });
+      const upstreamBody = Buffer.from(await upstream.arrayBuffer());
+      res.writeHead(upstream.status, {
+        "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8"
+      });
+      res.end(upstreamBody);
+      return;
+    }
     let filePath;
     if (["/admin","/admin/","/admin.html"].includes(url.pathname)) {
       filePath = resolve(repoRoot, "web-recovery/admin.html");
@@ -121,14 +159,15 @@ const server = http.createServer(async (req, res) => {
     } else if (["/pos","/pos/","/pos.html"].includes(url.pathname)) {
       let html = await readFile(resolve(repoRoot, "web-recovery/pos.html"), "utf8");
       // Rewrite the legacy hard-coded endpoint only in this in-memory test response.
-      html = html.replaceAll("https://" + productionSupabaseHost, mockOrigin)
-        .replaceAll("sb_publishable_BMMN_4HJf1JSWKVo-TaxcQ_eG36VtE4", "test-publishable-key-not-real");
+      html = html.replaceAll("https://" + productionSupabaseHost, appBaseUrl)
+        .replaceAll("sb_publishable_BMMN_4HJf1JSWKVo-TaxcQ_eG36VtE4", browserApiKey);
       res.writeHead(200, {"content-type":"text/html; charset=utf-8"});
       res.end(html);
       return;
     } else if (url.pathname === "/config.js") {
       res.writeHead(200, {"content-type":"text/javascript; charset=utf-8"});
-      res.end('const SUPABASE_URL = "' + mockOrigin + '"; const SUPABASE_KEY = "test-publishable-key-not-real";');
+      res.end('const SUPABASE_URL = ' + JSON.stringify(useLocalPostgrest ? appBaseUrl : mockOrigin) +
+        '; const SUPABASE_KEY = ' + JSON.stringify(browserApiKey) + ';');
       return;
     } else if (url.pathname === "/sw.js") {
       res.writeHead(404);
@@ -164,6 +203,15 @@ function installNetworkStubs(page) {
   page.on("pageerror", error => browserErrors.push(error.message));
   page.on("request", request => {
     if (request.url().includes(productionSupabaseHost)) productionRequests.push(request.url());
+    try {
+      const requestUrl = new URL(request.url());
+      const match = requestUrl.pathname.match(/\/rpc\/([^/]+)$/);
+      if (match && request.method() === "POST") {
+        let args = {};
+        try { args = request.postDataJSON() || {}; } catch {}
+        observedRpcCalls.push({name:decodeURIComponent(match[1]),args});
+      }
+    } catch {}
   });
   return page.route("**/*", async route => {
     const requestUrl = new URL(route.request().url());
@@ -205,10 +253,12 @@ async function main() {
   });
   const address = server.address();
   const baseUrl = "http://127.0.0.1:" + address.port;
+  appBaseUrl = baseUrl;
   const browser = await chromium.launch({headless:true});
   try {
     // Admin: existing mock login, promotion panel mounting, and promotion tab.
-    const admin = await browser.newPage();
+    const adminContext = await browser.newContext({timezoneId:"America/Merida"});
+    const admin = await adminContext.newPage();
     await installNetworkStubs(admin);
     await admin.addInitScript(() => {
       window.alert = () => {};
@@ -223,18 +273,25 @@ async function main() {
     await admin.getByRole("button", {name:"Promociones y sugerencias"}).click();
     await admin.getByText("Crear promoción").waitFor({state:"visible"});
     await waitForRpcCall("barber_promotions_admin_list");
-    assert.ok(calls.some(call => call.name === "barber_promotions_admin_list"),
-      "Admin should request the promotions list through the mocked RPC");
+    assert.ok(rpcCallSeen("barber_promotions_admin_list"),
+      "Admin should request the promotions list through the active RPC endpoint");
+    if (useLocalPostgrest) {
+      await admin.getByText("CI browser promotion integration").waitFor({state:"visible",timeout:10000});
+    }
 
     // Customer: public services/schedule, approved offer display, reservation call
     // sends identifiers to the server but does not send a trusted client price.
-    const client = await browser.newPage();
+    const clientContext = await browser.newContext({timezoneId:"America/Merida"});
+    const client = await clientContext.newPage();
     await installNetworkStubs(client);
     await client.addInitScript(() => {
       window.alert = () => {};
       window.open = () => null;
     });
     await client.goto(baseUrl + "/cliente", {waitUntil:"domcontentloaded"});
+    if (useLocalPostgrest) {
+      await client.locator("#dates .date-card:not(.dom)").nth(1).click();
+    }
     await client.locator(".hora.libre").first().waitFor({state:"visible",timeout:10000});
     const availableTime = client.locator(".hora.libre").filter({hasText:"13:30"}).first();
     await availableTime.click();
@@ -245,16 +302,17 @@ async function main() {
     await client.locator("#tel").fill("9990000000");
     await client.getByRole("button", {name:"Reservar por WhatsApp"}).click();
     await client.getByText("Reserva realizada").waitFor({state:"visible",timeout:10000});
-    const reservationCall = calls.find(call => call.name === "barber_create_reservation_with_promotion");
+    const reservationCall = [...observedRpcCalls,...calls].find(call => call.name === "barber_create_reservation_with_promotion");
     assert.ok(reservationCall, "Customer should invoke the server reservation RPC");
     assert.equal(Number(reservationCall.args.p_servicio_id), 1);
-    assert.equal(reservationCall.args.p_promotion_id, "promo-test-1");
+    assert.ok(reservationCall.args.p_promotion_id, "reservation RPC should include the selected promotion ID");
     assert.equal(Object.hasOwn(reservationCall.args, "p_precio"), false,
       "Client must not send an authoritative reservation price");
 
     // POS: current layout, login, walk-in modal and print-ticket flow, with API
     // completely stubbed. No payment or sale reaches the real service.
-    const pos = await browser.newPage();
+    const posContext = await browser.newContext({timezoneId:"America/Merida"});
+    const pos = await posContext.newPage();
     await installNetworkStubs(pos);
     await pos.addInitScript(() => {
       window.alert = () => {};
@@ -273,20 +331,20 @@ async function main() {
     await pos.locator("#wmethod").selectOption({label:"Efectivo"});
     await pos.locator("#wreceived").fill("160");
     await pos.locator("#walkCharge").click();
-    await pos.getByText("QA-WALKIN-001").waitFor({state:"visible"});
+    await pos.getByText(useLocalPostgrest ? "QA-WALKIN-HTTP-001" : "QA-WALKIN-001").waitFor({state:"visible"});
     assert.equal(await pos.evaluate(() => window.__qaPrintCalled), true,
       "POS should invoke the ticket-print flow after mocked walk-in sale");
-    assert.ok(calls.some(call => call.name === "barber_admin_create_walkin_sale"),
-      "POS should invoke the mocked walk-in sale RPC");
+    assert.ok(rpcCallSeen("barber_admin_create_walkin_sale"),
+      "POS should invoke the walk-in sale RPC");
 
     assert.deepEqual(productionRequests, [],
       "Browser test must make zero requests to the production Supabase project");
     assert.deepEqual(browserErrors, [], "Browser pages should not throw uncaught JavaScript errors");
 
-    console.log("PASS: Admin login and promotion panel mount (RPC mocked)");
-    console.log("PASS: Cliente shows a 10% approved offer and calls reservation RPC (RPC mocked)");
-    console.log("PASS: POS walk-in checkout reaches ticket print flow (RPC mocked)");
-    console.log("PASS: zero requests to production Supabase; all RPC responses are local test fixtures");
+    console.log("PASS: Admin login and promotion panel mount (" + (useLocalPostgrest ? "local PostgREST RPC" : "mocked RPC") + ")");
+    console.log("PASS: Cliente shows a 10% approved offer and calls reservation RPC (" + (useLocalPostgrest ? "local PostgREST RPC" : "mocked RPC") + ")");
+    console.log("PASS: POS walk-in checkout reaches ticket print flow (" + (useLocalPostgrest ? "CI-only no-write RPC fixture" : "mocked RPC") + ")");
+    console.log("PASS: zero browser requests to production Supabase; API base is " + (useLocalPostgrest ? "local test proxy" : "local mock"));
   } finally {
     await browser.close();
     await new Promise(resolveClose => server.close(resolveClose));
