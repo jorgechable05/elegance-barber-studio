@@ -19,13 +19,14 @@
 - [x] Flujo de navegador contra PostgREST local y verificación/limpieza de la reserva creada.
 - [x] Contratos del scheduler, permisos e idempotencia en PostgreSQL temporal.
 - [x] Prueba concurrente de promoción de uso único.
-- [x] Resultado de la ejecución aislada: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41242485408
+- [x] Resultado de la ejecución aislada con persistencia de venta de prueba, pagos mixtos, sintaxis de POS y demás suites: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41242628784
+- [x] POS recuperado en rama aislada ya no incorpora el endpoint ni la clave en el código fuente; exige configuración explícita y rechaza de forma preventiva el host `elegance-piste`. Se verificó con Playwright y cero peticiones al backend activo.
 
 ## Bloqueos para certificar producción
 - [ ] **Contrato real del POS:** el backend real no está versionado en este repositorio y no se confirmó que `barber_admin_create_sale` ni `barber_admin_create_walkin_sale` acepten `p_efectivo` y `p_tarjeta`. La prueba actual demuestra persistencia y lectura solo en el fixture de CI; no equivale a una venta persistida en Supabase. No desplegar el cambio de pagos mixtos hasta alinear y probar la RPC real en un entorno no productivo.
 - [ ] **Supabase no productivo:** no se identificó un proyecto de pruebas separado de Elegance. No usar `elegance-piste`, no aplicar migraciones ni ejecutar ventas reales hasta identificar/autorizar el entorno aislado.
 - [ ] **Scheduler en Supabase:** CI prueba la función e idempotencia en PostgreSQL temporal, pero no demuestra que `pg_cron` esté instalado/activo ni que exista el trabajo diario en una instancia de Supabase.
-- [ ] **Preview de Vercel:** falta probar la publicación aislada. No publicar el POS recuperado en preview mientras conserve el endpoint del proyecto activo en el HTML; primero debe configurarse para exigir un endpoint de prueba, evitando que una vista previa pueda escribir en producción.
+- [ ] **Preview de Vercel:** falta publicar y probar un preview aislado con variables de entorno exclusivamente de prueba; no iniciar sesión ni ejecutar RPC si no existe un backend de pruebas autorizado.
 - [x] No se aplicaron migraciones a Supabase, no se creó rama/proyecto de pago y no se cambió Vercel.
 
 **Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** Mantener PR #1 en borrador; no fusionar ni desplegar hasta resolver los bloqueos anteriores.
