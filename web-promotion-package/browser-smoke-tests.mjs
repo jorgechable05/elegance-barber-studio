@@ -79,14 +79,7 @@ function rpcFixture(name, args = {}) {
     case "barber_create_reservation_with_promotion":
       return {id:"QA-RESERVATION-001",precio:144};
     case "barber_admin_create_walkin_sale":
-      return {
-        folio:"QA-WALKIN-001",
-        total:160,
-        cliente:args.p_cliente || "Cliente QA",
-        servicio:"Corte Clásico",
-        barbero:"EdgarMay",
-        metodo:args.p_metodo || "Efectivo"
-      };
+      return {folio:"QA-WALKIN-001",total:160,cliente:args.p_cliente||"Cliente QA",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0)};
     default:
       return {};
   }
@@ -365,13 +358,14 @@ async function main() {
       await pos.locator("#wname").fill("Cliente QA local");
       await pos.locator("#wservice").selectOption("1");
       await pos.locator("#wmethod").selectOption({label:method});
-      await pos.locator("#wreceived").fill("160");
+      if(method==="Mixto"){await pos.locator("#wcashPart").fill("100");await pos.locator("#wcardPart").fill("60");}else{await pos.locator("#wreceived").fill("160");}
       await pos.evaluate(() => { window.__qaPrintCalled = false; });
       await pos.locator("#walkCharge").click();
       await pos.locator("#walkinModal").waitFor({state:"hidden"});
       const latestWalkinCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_walkin_sale").at(-1);
       assert.ok(latestWalkinCall, "POS should invoke the walk-in sale RPC for " + method);
       assert.equal(latestWalkinCall.args.p_metodo, method, "POS should preserve selected payment method");
+      if(method==="Mixto"){assert.equal(Number(latestWalkinCall.args.p_efectivo),100);assert.equal(Number(latestWalkinCall.args.p_tarjeta),60);assert.match(await pos.locator("#ticketPrint").innerText(),/EFECTIVO:\s*\$100\.00/);assert.match(await pos.locator("#ticketPrint").innerText(),/TARJETA:\s*\$60\.00/);}
       assert.equal(await pos.evaluate(() => window.__qaPrintCalled), true,
         "POS should invoke the ticket-print flow for " + method);
     }
