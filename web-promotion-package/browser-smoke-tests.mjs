@@ -135,7 +135,7 @@ const server = http.createServer(async (req, res) => {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       if (useLocalPostgrest) {
-        const upstreamUrl = process.env.PGRST_URL.replace(/\\/$/, "") + url.pathname + url.search;
+        const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + url.pathname + url.search;
         const upstream = await fetch(upstreamUrl, {
           method: req.method,
           headers: {
