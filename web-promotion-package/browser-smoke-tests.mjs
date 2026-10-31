@@ -131,24 +131,31 @@ window.supabase = {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");
-    if (useLocalPostgrest && url.pathname.startsWith("/rest/v1/rpc/")) {
+    if (url.pathname.startsWith("/rest/v1/rpc/")) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
-      const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + url.pathname + url.search;
-      const upstream = await fetch(upstreamUrl, {
-        method: req.method,
-        headers: {
-          ...(req.headers.authorization ? {authorization:req.headers.authorization} : {}),
-          ...(req.headers.apikey ? {apikey:req.headers.apikey} : {}),
-          "content-type": req.headers["content-type"] || "application/json"
-        },
-        ...(req.method === "GET" || req.method === "HEAD" ? {} : {body:Buffer.concat(chunks)})
-      });
-      const upstreamBody = Buffer.from(await upstream.arrayBuffer());
-      res.writeHead(upstream.status, {
-        "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8"
-      });
-      res.end(upstreamBody);
+      if (useLocalPostgrest) {
+        const upstreamUrl = process.env.PGRST_URL.replace(/\\/$/, "") + url.pathname + url.search;
+        const upstream = await fetch(upstreamUrl, {
+          method: req.method,
+          headers: {
+            ...(req.headers.authorization ? {authorization:req.headers.authorization} : {}),
+            ...(req.headers.apikey ? {apikey:req.headers.apikey} : {}),
+            "content-type": req.headers["content-type"] || "application/json"
+          },
+          ...(req.method === "GET" || req.method === "HEAD" ? {} : {body:Buffer.concat(chunks)})
+        });
+        const upstreamBody = Buffer.from(await upstream.arrayBuffer());
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8"
+        });
+        res.end(upstreamBody);
+      } else {
+        let args = {};
+        try { args = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch {}
+        res.writeHead(200, {"content-type":"application/json; charset=utf-8"});
+        res.end(JSON.stringify(rpcFixture(decodeURIComponent(url.pathname.split("/").pop()), args)));
+      }
       return;
     }
     let filePath;
