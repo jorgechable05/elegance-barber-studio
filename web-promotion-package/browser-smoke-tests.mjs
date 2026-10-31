@@ -222,7 +222,8 @@ async function main() {
     await admin.locator("#promotionsToggle").click();
     await admin.getByRole("button", {name:"Promociones y sugerencias"}).click();
     await admin.getByText("Crear promoción").waitFor({state:"visible"});
-    assert.ok(calls.some(call => call.name === "barber_promotion_admin_list"),
+    await waitForRpcCall("barber_promotions_admin_list");
+    assert.ok(calls.some(call => call.name === "barber_promotions_admin_list"),
       "Admin should request the promotions list through the mocked RPC");
 
     // Customer: public services/schedule, approved offer display, reservation call
