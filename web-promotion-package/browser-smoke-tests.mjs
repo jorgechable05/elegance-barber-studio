@@ -338,18 +338,28 @@ async function main() {
     await pos.locator("#p").fill("local-qa-password-not-a-credential");
     await pos.locator("#go").click();
     await pos.locator("#app").waitFor({state:"visible"});
-    await pos.locator("#openWalkin").click();
-    await pos.locator("#walkinModal").waitFor({state:"visible"});
-    await pos.locator("#wname").fill("Cliente QA local");
-    await pos.locator("#wservice").selectOption("1");
-    await pos.locator("#wmethod").selectOption({label:"Efectivo"});
-    await pos.locator("#wreceived").fill("160");
-    await pos.locator("#walkCharge").click();
-    await pos.getByText(useLocalPostgrest ? "QA-WALKIN-HTTP-001" : "QA-WALKIN-001").waitFor({state:"visible"});
-    assert.equal(await pos.evaluate(() => window.__qaPrintCalled), true,
-      "POS should invoke the ticket-print flow after mocked walk-in sale");
-    assert.ok(rpcCallSeen("barber_admin_create_walkin_sale"),
-      "POS should invoke the walk-in sale RPC");
+    const printCss = (await pos.locator("style").allTextContents()).join("\\n");
+    assert.match(printCss, /@page\\s*\\{[^}]*size:\\s*58mm auto/i,
+      "POS receipt must retain its 58mm thermal print layout");
+    const methods = ["Efectivo", "Transferencia", "Tarjeta", "Mixto"];
+    const methodOptions = await pos.locator("#wmethod option").allTextContents();
+    for (const method of methods) assert.ok(methodOptions.includes(method), "Missing POS payment method: " + method);
+    for (const method of methods) {
+      await pos.locator("#openWalkin").click();
+      await pos.locator("#walkinModal").waitFor({state:"visible"});
+      await pos.locator("#wname").fill("Cliente QA local");
+      await pos.locator("#wservice").selectOption("1");
+      await pos.locator("#wmethod").selectOption({label:method});
+      await pos.locator("#wreceived").fill("160");
+      await pos.evaluate(() => { window.__qaPrintCalled = false; });
+      await pos.locator("#walkCharge").click();
+      await pos.locator("#walkinModal").waitFor({state:"hidden"});
+      const latestWalkinCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_walkin_sale").at(-1);
+      assert.ok(latestWalkinCall, "POS should invoke the walk-in sale RPC for " + method);
+      assert.equal(latestWalkinCall.args.p_metodo, method, "POS should preserve selected payment method");
+      assert.equal(await pos.evaluate(() => window.__qaPrintCalled), true,
+        "POS should invoke the ticket-print flow for " + method);
+    }
 
     assert.deepEqual(productionRequests, [],
       "Browser test must make zero requests to the production Supabase project");
