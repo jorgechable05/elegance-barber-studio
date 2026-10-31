@@ -26,7 +26,8 @@
 - [ ] **Contrato real del POS:** el backend real no está versionado en este repositorio y no se confirmó que `barber_admin_create_sale` ni `barber_admin_create_walkin_sale` acepten `p_efectivo` y `p_tarjeta`. La prueba actual demuestra persistencia y lectura solo en el fixture de CI; no equivale a una venta persistida en Supabase. No desplegar el cambio de pagos mixtos hasta alinear y probar la RPC real en un entorno no productivo.
 - [ ] **Supabase no productivo:** no se identificó un proyecto de pruebas separado de Elegance. No usar `elegance-piste`, no aplicar migraciones ni ejecutar ventas reales hasta identificar/autorizar el entorno aislado.
 - [ ] **Scheduler en Supabase:** CI prueba la función e idempotencia en PostgreSQL temporal, pero no demuestra que `pg_cron` esté instalado/activo ni que exista el trabajo diario en una instancia de Supabase.
-- [ ] **Preview de Vercel:** falta publicar y probar un preview aislado con variables de entorno exclusivamente de prueba; no iniciar sesión ni ejecutar RPC si no existe un backend de pruebas autorizado.
+- [x] **Vista previa de interfaz:** se desplegó y probó un preview Vercel que solo usa un mock local incluido en el despliegue. URL: https://elegance-barber-piste-g8njzuafo-dell-723c.vercel.app. No hay persistencia y WhatsApp está desactivado.
+- [ ] **Integración real de backend:** este preview no sustituye a una instancia Supabase no productiva. No iniciar pruebas de persistencia real mientras no se identifique/autorice ese backend.
 - [x] No se aplicaron migraciones a Supabase, no se creó rama/proyecto de pago y no se cambió Vercel.
 
-**Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** Mantener PR #1 en borrador; no fusionar ni desplegar hasta resolver los bloqueos anteriores.
+**Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** El preview valida solo la interfaz y contratos simulados. Mantener PR #1 en borrador; no fusionar ni desplegar hasta probar el backend real y el scheduler en una instancia no productiva.
