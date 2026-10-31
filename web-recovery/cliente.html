@@ -68,6 +68,7 @@ body{background:#0a0a0a;color:#fff;font-family:'Inter',sans-serif}
 
 <div class="categoria">Horarios 1:30pm-8:30pm</div>
 <div class="grid" id="horas"></div>
+<div id="promotionOffer" class="form" style="display:none;margin-top:12px;border:1px solid #D4AF37;padding:12px;border-radius:10px"></div>
 
 <div class="form">
 <input class="input" id="nombre" placeholder="Tu nombre">
@@ -87,6 +88,7 @@ const HORAS=["13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17
 let serv="Corte Clásico", precio=160, barbero="EdgarMay", fecha=new Date();
 let catalog={services:[],barbers:[]};
 let selectedServiceId=1, selectedBarberId=1;
+let basePrecio=160, selectedPromotion=null;
 
 function localDate(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -97,7 +99,7 @@ function getSelectedDate(){ return localDate(fecha); }
 function sel(el){
   document.querySelectorAll('.service').forEach(s=>s.classList.remove('active'));
   el.classList.add('active');
-  serv=el.dataset.serv; precio=Number(el.dataset.price); selectedServiceId=Number(el.dataset.id);
+  serv=el.dataset.serv; basePrecio=Number(el.dataset.price); precio=basePrecio; selectedServiceId=Number(el.dataset.id); refreshPromotionOffer();
 }
 
 function setBarbero(btn){
@@ -117,7 +119,7 @@ function genFechas(){
     card.className='date-card'+(i===0?' active':'')+(d.getDay()===0?' dom':'');
     card.innerHTML=`<div style="font-size:10px">${i===0?'HOY':dias[d.getDay()]}</div><div style="font-weight:700">${d.getDate()}</div><div style="font-size:10px">${meses[d.getMonth()]}</div>`;
     if(d.getDay()!==0){
-      card.onclick=()=>{document.querySelectorAll('.date-card').forEach(c=>c.classList.remove('active'));card.classList.add('active');fecha=d;renderHoras();};
+      card.onclick=()=>{document.querySelectorAll('.date-card').forEach(c=>c.classList.remove('active'));card.classList.add('active');fecha=d;localStorage.removeItem('horaSel');renderHoras();};
     }
     cont.appendChild(card);
   }
@@ -140,12 +142,13 @@ async function renderHoras(){
         div.dataset.selected=row.hora;
         document.querySelectorAll('.hora').forEach(x=>x.classList.remove('selected-hour'));
         div.classList.add('selected-hour');
-        localStorage.setItem('horaSel',row.hora);
+        localStorage.setItem('horaSel',row.hora); refreshPromotionOffer();
       };
     }
     cont.appendChild(div);
   });
   updateServiceAvailability(rows);
+  refreshPromotionOffer();
 }
 
 function initCatalog(){
@@ -161,6 +164,102 @@ function updateServiceAvailability(rows){
     for(let i=0;i<=list.length-needed;i++){let ok=true;for(let j=0;j<needed;j++){if(!list[i+j]||!list[i+j].disponible){ok=false;break;}}if(ok)available++;}
     const node=el.querySelector('.stock');if(node)node.textContent=available>0?(available===1?'1 espacio disponible':available+' espacios disponibles'):'Sin disponibilidad';el.classList.toggle('low',available===0);
   });
+}
+
+
+async function refreshPromotionOffer(){
+  const box=document.getElementById('promotionOffer');
+  if(!box) return;
+  selectedPromotion=null; precio=basePrecio;
+  const hora=localStorage.getItem('horaSel');
+  if(!hora){box.style.display='none';return;}
+  try{
+    const [{data,error},utils]=await Promise.all([
+      db.rpc('barber_promotions_public'),
+      import('./web-promotion-package/customer-promotion-utils.js')
+    ]);
+    if(error) throw error;
+    const appointment=new Date(getSelectedDate()+'T'+hora+':00-06:00');
+    const eligible=utils.applicablePromotions(data||[],selectedServiceId,appointment.toISOString());
+    const offers=eligible.map(p=>({promotion:p,price:utils.calculatePromotionPrice(basePrecio,p)})).filter(x=>x.price<basePrecio).sort((a,b)=>a.price-b.price);
+    if(!offers.length){box.style.display='none';return;}
+    selectedPromotion=offers[0].promotion; precio=offers[0].price;
+    box.style.display='block';
+    box.innerHTML='<div style="color:#D4AF37;font-weight:700">PROMOCIÓN DISPONIBLE</div><div style="font-size:12px;color:#ddd;margin-top:5px">'+String(selectedPromotion.title||selectedPromotion.description||'Descuento especial').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</div><div style="margin-top:6px"><span style="color:#888;text-decoration:line-through">
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation_with_promotion',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:'',p_promotion_id:selectedPromotion?.id||null
+  });
+  if(error){alert(error.message.replace(/^.*?: /,'')); await renderHoras(); return;}
+  const msg=`Hola, soy ${nombre}. Quiero reservar ${serv} ${precio} con ${barbero} el ${fecha.toLocaleDateString('es-MX')} a las ${hora}. Tel: ${tel}. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio ${data.id}.`;
+  window.open(`https://wa.me/529851254721?text=${encodeURIComponent(msg)}`,'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML=`<div style="text-align:center">
+    <div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>
+    <div style="font-size:12px;color:#ddd;line-height:1.9">📅 ${fechaTexto}<br>🕐 ${hora}<br>💈 ${barbero}<br>✂️ ${serv}</div>
+    <button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>
+    <div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div>
+  </div>`;
+  confirm.querySelector('button').onclick=()=>{
+    const prueba=`https://wa.me/529851254721?text=${encodeURIComponent('ELEGANCE BARBER STUDIO\\n\\n✅ RESERVA REALIZADA\\n📅 '+fechaTexto+'\\n🕐 '+hora+'\\n💈 '+barbero+'\\n✂️ '+serv)}`;
+    window.open(prueba,'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel'); document.getElementById('nombre').value=''; document.getElementById('tel').value='';
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>+basePrecio+'</span> <b style="color:#10B981;font-size:18px">
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:''
+  });
+  if(error){alert(error.message.replace(/^.*?: /,'')); await renderHoras(); return;}
+  const msg=`Hola, soy ${nombre}. Quiero reservar ${serv} ${precio} con ${barbero} el ${fecha.toLocaleDateString('es-MX')} a las ${hora}. Tel: ${tel}. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio ${data.id}.`;
+  window.open(`https://wa.me/529851254721?text=${encodeURIComponent(msg)}`,'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML=`<div style="text-align:center">
+    <div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>
+    <div style="font-size:12px;color:#ddd;line-height:1.9">📅 ${fechaTexto}<br>🕐 ${hora}<br>💈 ${barbero}<br>✂️ ${serv}</div>
+    <button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>
+    <div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div>
+  </div>`;
+  confirm.querySelector('button').onclick=()=>{
+    const prueba=`https://wa.me/529851254721?text=${encodeURIComponent('ELEGANCE BARBER STUDIO\\n\\n✅ RESERVA REALIZADA\\n📅 '+fechaTexto+'\\n🕐 '+hora+'\\n💈 '+barbero+'\\n✂️ '+serv)}`;
+    window.open(prueba,'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel'); document.getElementById('nombre').value=''; document.getElementById('tel').value='';
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>+precio+'</b></div><div style="font-size:10px;color:#888;margin-top:4px">Aplicable para la fecha, hora y servicio seleccionados.</div>';
+  }catch(error){
+    box.style.display='none';selectedPromotion=null;precio=basePrecio;
+    console.warn('No se pudieron consultar promociones',error);
+  }
 }
 
 async function reservar(){
