@@ -56,6 +56,8 @@ jobs:
         run: node browser-smoke-tests.mjs
       - name: Create minimal existing-schema fixture
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/fixture.sql
+      - name: Install CI-only legacy UI RPC fixtures
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/legacy_ui_rpc_fixture.sql
       - name: Apply additive promotion migrations to temporary PostgreSQL
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_services_promotions_draft.sql
@@ -65,5 +67,42 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
       - name: Verify price rounding and admin-session guards
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_behavior.sql
+      - name: Start local PostgREST API for RPC integration
+        env:
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: |
+          docker run --detach --name postgrest-rpc-test --network host \
+            -e PGRST_DB_URI=postgres://postgres:postgres@127.0.0.1:5432/elegance_test \
+            -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET="$PGRST_JWT_SECRET" \
+            -e PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v16.5
+          ready=0
+          for attempt in $(seq 1 30); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ || true)"
+            if [ "$code" != "000" ] && [ -n "$code" ]; then
+              ready=1
+              echo "PostgREST HTTP listener ready (root HTTP status $code)"
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then docker logs postgrest-rpc-test; exit 1; fi
+      - name: Exercise promotion RPCs through local PostgREST HTTP
+        working-directory: web-promotion-package
+        env:
+          PGRST_URL: http://127.0.0.1:3000
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: node rpc-http-integration-tests.mjs
+      - name: Assert and clean local HTTP RPC records
+        if: always()
+        run: |
+          if docker inspect postgrest-rpc-test >/dev/null 2>&1; then
+            psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_http_integration.sql
+          fi
+      - name: Stop local PostgREST API
+        if: always()
+        run: docker rm --force postgrest-rpc-test || true
       - name: Verify single-use promotion under concurrent reservations
         run: bash supabase/tests/assert_concurrent_uses.sh
