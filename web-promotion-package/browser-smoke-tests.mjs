@@ -163,10 +163,11 @@ const server = http.createServer(async (req, res) => {
       filePath = resolve(repoRoot, "web-recovery/cliente.html");
     } else if (["/pos","/pos/","/pos.html"].includes(url.pathname)) {
       let html = await readFile(resolve(repoRoot, "web-recovery/pos.html"), "utf8");
-      // Rewrite the legacy hard-coded endpoint only in this in-memory test response.
-      const apiUrl = appBaseUrl;
-      html = html.replaceAll("https://" + productionSupabaseHost, apiUrl)
-        .replaceAll("sb_publishable_BMMN_4HJf1JSWKVo-TaxcQ_eG36VtE4", browserApiKey);
+      // Inject an ephemeral local/mock endpoint only into the in-memory test response.
+      const apiUrl = useLocalPostgrest ? appBaseUrl : mockOrigin;
+      const runtimeConfig = 'window.ELEGANCE_SUPABASE_URL = ' + JSON.stringify(apiUrl) +
+        '; window.ELEGANCE_SUPABASE_ANON_KEY = ' + JSON.stringify(browserApiKey) + ';';
+      html = html.replace("const URL=window.ELEGANCE_SUPABASE_URL||'',KEY=window.ELEGANCE_SUPABASE_ANON_KEY||'';", runtimeConfig + " const URL=window.ELEGANCE_SUPABASE_URL||'',KEY=window.ELEGANCE_SUPABASE_ANON_KEY||'';");
       res.writeHead(200, {"content-type":"text/html; charset=utf-8"});
       res.end(html);
       return;
