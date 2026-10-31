@@ -1,21 +1,21 @@
 # Estado de implementación (actualizado 2026-10-31)
 
-## Comprobaciones realizadas
-- [x] La rama de trabajo permanece separada de `main`.
-- [x] Paquete Admin de servicios/promociones y utilidades de aplicabilidad/precio añadidos por separado.
-- [x] Las rutas productivas `/admin`, `/cliente` y `/pos` responden HTTP 200 en comprobación de lectura.
-- [x] Inspeccionada la RPC real `barber_create_reservation`: toma `p_servicio_id` como entero 1–9, obtiene nombre/precio de un catálogo `VALUES` incorporado a la función y guarda el importe en `reservas`.
-- [x] Inspeccionada `barber_admin_create_walkin_sale`: usa su propio catálogo numérico fijo; POS no debe cambiarse sin una prueba específica.
-- [x] Los borradores SQL aún no se aplican.
-- [x] Pruebas unitarias de utilidades ejecutadas en Node 22 con `TZ=America/Merida`: 7/7 pasan tras validar manualmente la lógica de zona horaria.
+## Avance sin crear infraestructura de pago
+- [x] Recuperadas en la rama aislada las fuentes actuales de `/admin`, `/cliente` y `/pos` bajo `web-recovery/`; no se modificó el despliegue.
+- [x] Añadido al Admin recuperado un acceso separado a Servicios y Promociones, reutilizando el login/token actual y el adaptador de RPC. La agenda existente queda intacta por defecto.
+- [x] El cliente recuperado consulta el catálogo administrable, muestra solo servicios activos y calcula la oferta aprobada aplicable a la fecha/hora/servicio seleccionados.
+- [x] Añadida RPC aditiva `barber_create_reservation_with_promotion`: valida promoción aprobada en servidor, servicio, fecha, hora, usos y precio; conserva el importe en la reserva y no recalcula citas existentes. La RPC antigua permanece.
+- [x] Los IDs de servicio permanecen numéricos 1–9 y el catálogo inicial conserva nombres y precios históricos conocidos.
+- [x] La función de sugerencias diarias para scheduler queda restringida a `service_role`; el script intenta programarla solo si `pg_cron` ya existe.
+- [x] Preparado workflow de GitHub Actions con PostgreSQL temporal para probar migraciones y contratos sin crear rama de Supabase de pago.
+- [x] Abierto PR de borrador #1, no fusionado: https://github.com/jorgechable05/elegance-barber-studio/pull/1
 
-## Bloqueos de integración
-- [ ] Este repositorio contiene un wrapper Android, pero no la fuente web original versionada de `/admin`, `/cliente` ni `/pos`.
-- [ ] La herramienta de Supabase informa un costo de US$0.01344 por hora para crear una rama de desarrollo; requiere confirmación de costo antes de poder probar migraciones aisladas.
-- [ ] Hay que resolver la clave de compatibilidad entre servicios UUID nuevos e IDs numéricos 1–9 antes de conectar catálogo y reservas.
-- [ ] El descuento debe validarse y guardarse transaccionalmente en backend al crear una reserva; no debe confiarse en el navegador.
-- [ ] Debe resolverse si los precios de reserva admiten centavos: `reservas.precio` es `integer` en la base actual, mientras que el helper de promociones calcula dos decimales.
-- [ ] El generador diario de sugerencias de borrador requiere un token interactivo; un scheduler necesita una función interna segura, no ejecutable por usuarios anónimos.
-- [ ] Ejecutar regresión Admin/Cliente/POS completa con entorno aislado y pruebas de extremo a extremo.
+## Pendiente de validación
+- [ ] Esperar/inspeccionar el resultado del workflow CI y corregir cualquier fallo SQL/JavaScript.
+- [ ] Revisar el cálculo de importes con centavos: la columna heredada `reservas.precio` es integer; por compatibilidad, la RPC redondea el precio final a pesos enteros.
+- [ ] Revisar que el montaje de Admin funciona en la ruta y el hosting real cuando el código web esté versionado como raíz desplegable.
+- [ ] Verificar el scheduler diario en la configuración real de Supabase; la migración no habilita extensiones que no estén instaladas.
+- [ ] Ejecutar regresión end-to-end Admin/Cliente/POS. El POS solo está versionado como referencia y no se modificó.
+- [ ] No se aplicó ninguna migración a Supabase ni se creó rama de pago ni se cambió Vercel.
 
-**No desplegar a producción.** No se aplicaron migraciones, no se cambió el despliegue Vercel y no se modificó POS.
+**Estado:** integración en rama y pendiente de CI; no certificada para producción. No fusionar ni desplegar hasta cerrar los puntos anteriores.
