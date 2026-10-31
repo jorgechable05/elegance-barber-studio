@@ -12,14 +12,14 @@
 
 ## Pendiente de validación
 - [x] Corregido el delimitador SQL de la función interna de sugerencias; las ejecuciones 12 y 13 del workflow pasaron con JS, migraciones temporales y aserciones de esquema.
-- [ ] Ejecutar nuevas pruebas de comportamiento para redondeo, límites de uso y sesiones vencidas/revocadas; la regresión concurrente aún requiere resultado CI.
+- [x] Pruebas de comportamiento y concurrencia completadas en GitHub Actions: redondeo de importes, límite de usos, promociones pendientes, sesiones vencidas/revocadas y dos reservas simultáneas con un solo uso disponible. Ejecución final verificada: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209259949.
 - [x] Definida la regla compatible de importe: `reservas.precio` conserva pesos enteros y la vista calcula el mismo redondeo para que el importe guardado coincida con lo mostrado.
 - [ ] Revisar que el montaje de Admin funciona en la ruta y el hosting real cuando el código web esté versionado como raíz desplegable.
 - [ ] Verificar el scheduler diario en la configuración real de Supabase; la migración no habilita extensiones que no estén instaladas.
 - [ ] Ejecutar regresión end-to-end Admin/Cliente/POS. El POS solo está versionado como referencia y no se modificó.
-- [ ] No se aplicó ninguna migración a Supabase ni se creó rama de pago ni se cambió Vercel.
+- [x] No se aplicó ninguna migración a Supabase; no se creó rama de pago ni se cambió Vercel.
 
-**Estado:** las migraciones y contratos de esquema pasaron en PostgreSQL temporal; las pruebas añadidas de comportamiento/concurrencia y la regresión end-to-end siguen pendientes de resultado. No certificada para producción. No fusionar ni desplegar hasta cerrar los puntos anteriores.
+**Estado:** las migraciones, contratos de esquema, pruebas JavaScript y pruebas de comportamiento/concurrencia pasan en PostgreSQL temporal. La certificación integral sigue pendiente de pruebas end-to-end de Admin/Cliente/POS y de verificar el montaje y el scheduler en los entornos reales. No certificada para producción; no fusionar ni desplegar hasta cerrar esos puntos.
 
 
 - [x] La página Cliente recuperada contenía un bloque JavaScript truncado y fragmentos duplicados detrás de `</html>`; se reconstruyó el bloque de catálogo/reserva preservando la interfaz y se añadió verificación de sintaxis para Admin, Cliente y POS.
