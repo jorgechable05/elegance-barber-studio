@@ -134,8 +134,13 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/rest/v1/rpc/")) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
+      let args = {};
+      try { args = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch {}
+      const rpcName = decodeURIComponent(url.pathname.split("/").pop());
+      observedRpcCalls.push({name:rpcName,args});
       if (useLocalPostgrest) {
         const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + url.pathname + url.search;
+        const forwardedBody = Buffer.from(JSON.stringify(args));
         const upstream = await fetch(upstreamUrl, {
           method: req.method,
           headers: {
@@ -143,7 +148,7 @@ const server = http.createServer(async (req, res) => {
             ...(req.headers.apikey ? {apikey:req.headers.apikey} : {}),
             "content-type": req.headers["content-type"] || "application/json"
           },
-          ...(req.method === "GET" || req.method === "HEAD" ? {} : {body:Buffer.concat(chunks)})
+          ...(req.method === "GET" || req.method === "HEAD" ? {} : {body:forwardedBody})
         });
         const upstreamBody = Buffer.from(await upstream.arrayBuffer());
         res.writeHead(upstream.status, {
@@ -151,10 +156,8 @@ const server = http.createServer(async (req, res) => {
         });
         res.end(upstreamBody);
       } else {
-        let args = {};
-        try { args = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch {}
         res.writeHead(200, {"content-type":"application/json; charset=utf-8"});
-        res.end(JSON.stringify(rpcFixture(decodeURIComponent(url.pathname.split("/").pop()), args)));
+        res.end(JSON.stringify(rpcFixture(rpcName, args)));
       }
       return;
     }
