@@ -13,14 +13,17 @@
 ## Pendiente de validación
 - [x] Corregido el delimitador SQL de la función interna de sugerencias; las ejecuciones 12 y 13 del workflow pasaron con JS, migraciones temporales y aserciones de esquema.
 - [x] Pruebas de comportamiento y concurrencia completadas en GitHub Actions: redondeo de importes, límite de usos, promociones pendientes, sesiones vencidas/revocadas y dos reservas simultáneas con un solo uso disponible. Ejecución final anterior: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209259949.
-- [x] Validación aislada más reciente verificada en la ejecución 29: pruebas JavaScript, análisis sintáctico de Admin/Cliente/POS, migraciones en PostgreSQL temporal, contratos, permisos/sesiones y concurrencia pasaron: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209731720.
+- [x] Validación aislada de SQL/JavaScript verificada en la ejecución 40: pruebas JavaScript, análisis sintáctico de las tres vistas, migraciones en PostgreSQL temporal, contratos, permisos/sesiones y concurrencia pasaron: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41210225486.
+- [x] Pruebas de navegador con Playwright y RPC simuladas: Admin monta el panel, Cliente muestra la promoción aprobada y llama a la RPC de reserva, y POS recorre venta de mostrador hasta ticket. Se comprobó que no hubo peticiones al Supabase de producción. Ejecución PR: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41210230447.
 - [x] Definida la regla compatible de importe: `reservas.precio` conserva pesos enteros y la vista calcula el mismo redondeo para que el importe guardado coincida con lo mostrado.
-- [ ] Probar los imports de Admin/Cliente con Playwright en un preview aislado que reproduzca la raíz de publicación. El test actual confirma las fuentes del paquete, no la ruta del hosting real.
+- [x] Probar en un servidor local aislado el montaje de los módulos relativos de Admin y Cliente; los smoke tests de Playwright pasan con mocks.
+- [ ] Probar las rutas reales de publicación en un preview aislado de Vercel. La comprobación de producción fue solo GET de lectura: `/admin`, `/cliente` y `/pos` responden 200, pero aún no incluyen los módulos de promociones.
 - [ ] Verificar el scheduler diario en la configuración real de Supabase; la migración no habilita extensiones que no estén instaladas.
-- [ ] Ejecutar regresión end-to-end Admin/Cliente/POS. El POS solo está versionado como referencia y no se modificó.
+- [ ] Ejecutar integración real contra un proyecto Supabase no productivo de Elegance para aprobar/rechazar promociones, crear reservas y validar los permisos reales. No se identificó un proyecto separado de Elegance para pruebas; no reutilizar el backend activo.
+- [ ] Completar regresión del POS contra el backend de prueba, incluidos los cuatro métodos de pago y la impresión 58 mm. El navegador pasó el flujo de mostrador usando RPC simuladas; no hubo ventas reales.
 - [x] No se aplicó ninguna migración a Supabase; no se creó rama de pago ni se cambió Vercel.
 
-**Estado:** la CI aislada más reciente (ejecución 29) pasa con PostgreSQL temporal y pruebas JS/SQL. La certificación integral sigue pendiente de un entorno Supabase no productivo para probar RPC y reservas, E2E de navegador para Admin/Cliente, regresión funcional del POS y verificación del scheduler. No certificada para producción; no fusionar ni desplegar hasta cerrar esos puntos.
+**Estado:** la CI aislada más reciente (ejecuciones 40 y 41) pasa con PostgreSQL temporal y Playwright local usando mocks. Las pruebas de navegador no validan RPC reales. La certificación integral sigue pendiente de un proyecto Supabase no productivo de Elegance, un preview que refleje las rutas reales de publicación, la regresión POS contra ese backend y la verificación del scheduler. No certificada para producción; no fusionar ni desplegar hasta cerrar esos puntos.
 
 
 - [x] La página Cliente recuperada contenía un bloque JavaScript truncado y fragmentos duplicados detrás de `</html>`; se reconstruyó el bloque de catálogo/reserva preservando la interfaz y se añadió verificación de sintaxis para Admin, Cliente y POS.
