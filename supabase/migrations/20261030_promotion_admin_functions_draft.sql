@@ -160,6 +160,71 @@ begin
 end;
 $$;
 
+-- Internal no-session variant for a trusted scheduler. Never executable by anon/authenticated.
+create or replace function public.barber_promotions_generate_daily_suggestions_internal()
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare v_service record; v_promo_id uuid; v_created integer := 0; v_today date;
+begin
+  v_today := (now() at time zone 'America/Merida')::date;
+  for v_service in
+    select s.id, s.name
+    from public.barber_services s
+    where s.is_active
+      and not exists (
+        select 1 from public.barber_promotion_services ps
+        join public.barber_promotions p on p.id=ps.promotion_id
+        where ps.service_id=s.id and p.status='approved'
+          and p.starts_at < now()+interval '24 hours' and p.ends_at > now()
+      )
+      and not exists (
+        select 1 from public.barber_promotion_services ps
+        join public.barber_promotions p on p.id=ps.promotion_id
+        where ps.service_id=s.id and p.source='daily_suggestion'
+          and (p.created_at at time zone 'America/Merida')::date=v_today
+      )
+    order by s.display_order, s.name
+    limit 3
+  loop
+    insert into public.barber_promotions(
+      title,description,status,discount_type,discount_value,starts_at,ends_at,
+      weekdays,source
+    ) values (
+      'Sugerencia diaria: '||v_service.name,
+      'Propuesta automática del 10%. Revisa y ajusta antes de aprobar.',
+      'pending_review','percent',10,now(),now()+interval '24 hours',
+      array[extract(dow from now() at time zone 'America/Merida')::smallint],
+      'daily_suggestion'
+    ) returning id into v_promo_id;
+    insert into public.barber_promotion_services(promotion_id,service_id)
+      values (v_promo_id,v_service.id);
+    v_created := v_created+1;
+  end loop;
+  return v_created;
+end;
+$;
+
+revoke all on function public.barber_promotions_generate_daily_suggestions_internal() from public, anon, authenticated;
+grant execute on function public.barber_promotions_generate_daily_suggestions_internal() to service_role;
+
+-- Schedule at 12:00 UTC (~06:00 in Yucatán) only when pg_cron is already available.
+do $schedule$
+begin
+  if exists (select 1 from pg_extension where extname='pg_cron') then
+    execute $cmd$select cron.schedule(
+      'elegance-promotion-suggestions-daily',
+      '0 12 * * *',
+      'select public.barber_promotions_generate_daily_suggestions_internal();'
+    )$cmd$;
+  end if;
+exception when others then
+  raise notice 'Daily promotion scheduler not configured automatically: %', sqlerrm;
+end
+$schedule$;
+
 grant execute on function public.barber_promotions_admin_list(uuid) to anon, authenticated;
 grant execute on function public.barber_promotion_admin_save(uuid,uuid,text,text,text,numeric,timestamptz,timestamptz,smallint[],time,time,integer[],integer) to anon, authenticated;
 grant execute on function public.barber_promotions_generate_daily_suggestions(uuid) to anon, authenticated;
