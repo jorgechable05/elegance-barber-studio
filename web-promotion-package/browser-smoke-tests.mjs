@@ -273,7 +273,16 @@ async function main() {
     await admin.locator("#user").fill("local-qa-user");
     await admin.locator("#pass").fill("local-qa-password-not-a-credential");
     await admin.locator("#loginBtn").click();
-    await admin.locator("#app").waitFor({state:"visible"});
+    await admin.waitForFunction(() => {
+      const app = document.querySelector("#app");
+      const message = document.querySelector("#loginMsg");
+      return (app && getComputedStyle(app).display !== "none") || (message && message.textContent.trim() !== "");
+    }, { timeout: 10000 }).catch(() => {});
+    if (!(await admin.locator("#app").isVisible())) {
+      throw new Error("Admin mock login did not open #app. loginMsg=" +
+        JSON.stringify(await admin.locator("#loginMsg").textContent()) +
+        "; pageErrors=" + JSON.stringify(browserErrors));
+    }
     await admin.locator("#promotionsToggle").click();
     await admin.getByRole("button", {name:"Promociones y sugerencias"}).click();
     await admin.getByText("Crear promoción").waitFor({state:"visible"});
