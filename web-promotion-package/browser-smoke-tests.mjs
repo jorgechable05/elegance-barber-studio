@@ -288,6 +288,7 @@ async function main() {
     if (!(await admin.locator("#app").isVisible())) {
       throw new Error("Admin mock login did not open #app. loginMsg=" +
         JSON.stringify(await admin.locator("#loginMsg").textContent()) +
+        "; observedRpcCalls=" + JSON.stringify(observedRpcCalls) +
         "; pageErrors=" + JSON.stringify(browserErrors));
     }
     await admin.locator("#promotionsToggle").click();
