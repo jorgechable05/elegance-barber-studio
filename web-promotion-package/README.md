@@ -1,15 +1,22 @@
 # Paquete aislado de integración — Servicios y promociones
 
-> **NO DESPLEGAR A PRODUCCIÓN.** Este paquete está preparado para revisar e integrar al sitio web real cuando se obtenga su fuente versionada. No sustituye las páginas `/admin`, `/cliente` ni `/pos`.
+> **NO DESPLEGAR A PRODUCCIÓN.** Este paquete se revisa por separado; no sustituye ni modifica las páginas activas `/admin`, `/cliente` o `/pos`.
 
-## Contenido propuesto
-- `admin-promotions.js`: módulo JS adaptable para añadir una sección separada a la vista Admin después de validar sesión.
-- `customer-promotion-utils.js`: filtros y cálculo de promociones para fecha/hora futura seleccionada.
-- `tests/promotion-utils.test.mjs`: pruebas unitarias sin acceso a Supabase.
+## Contenido
+- `admin-promotions.js`: componente desacoplado para montar una nueva sección del administrador después del login existente.
+- `customer-promotion-utils.js`: validación de promoción por servicio, vigencia, día y horario local de Pisté, Yucatán, así como cálculo de descuento.
+- `customer-promotion-utils.test.mjs` y `smoke-tests.mjs`: pruebas unitarias aisladas.
 
-## Contratos no negociables
-- Los identificadores actuales de servicio del cliente son numéricos (1–9); no cambiar `barber_create_reservation` por UUID sin una migración de compatibilidad.
-- El módulo de promociones no modifica ventas ni las RPC POS.
-- Solo promociones aprobadas, dentro de vigencia, día, horario y servicio se deben mostrar.
-- El precio de una reserva ya creada no se recalcula si cambia el catálogo.
-- Las sugerencias diarias siempre se mantienen en revisión pendiente hasta decisión administrativa.
+## Pruebas locales
+En Node.js 22 o superior:
+```sh
+npm test
+```
+El comando fija la zona horaria del negocio como `America/Merida`.
+
+## Bloqueos antes de conectar
+- El repositorio no contiene fuente versionada de las páginas web. No pegar ni sustituir estas páginas a ciegas.
+- El cliente real usa IDs numéricos de servicios del 1 al 9; la migración propuesta usa UUID, falta la correspondencia.
+- El descuento debe validarse y aplicarse en el backend al crear la reserva. El navegador solo muestra el cálculo; no decide el importe persistido.
+- Solo promociones aprobadas y elegibles por fecha/hora/servicio se publican. Las sugerencias automáticas permanecen pendientes.
+- No cambiar RPC de venta/POS y no recalcular citas existentes.
