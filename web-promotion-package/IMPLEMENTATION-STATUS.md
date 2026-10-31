@@ -12,14 +12,15 @@
 
 ## Pendiente de validación
 - [x] Corregido el delimitador SQL de la función interna de sugerencias; las ejecuciones 12 y 13 del workflow pasaron con JS, migraciones temporales y aserciones de esquema.
-- [x] Pruebas de comportamiento y concurrencia completadas en GitHub Actions: redondeo de importes, límite de usos, promociones pendientes, sesiones vencidas/revocadas y dos reservas simultáneas con un solo uso disponible. Ejecución final verificada: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209259949.
+- [x] Pruebas de comportamiento y concurrencia completadas en GitHub Actions: redondeo de importes, límite de usos, promociones pendientes, sesiones vencidas/revocadas y dos reservas simultáneas con un solo uso disponible. Ejecución final anterior: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209259949.
+- [x] Validación aislada más reciente verificada en la ejecución 29: pruebas JavaScript, análisis sintáctico de Admin/Cliente/POS, migraciones en PostgreSQL temporal, contratos, permisos/sesiones y concurrencia pasaron: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209731720.
 - [x] Definida la regla compatible de importe: `reservas.precio` conserva pesos enteros y la vista calcula el mismo redondeo para que el importe guardado coincida con lo mostrado.
-- [ ] Revisar que el montaje de Admin funciona en la ruta y el hosting real cuando el código web esté versionado como raíz desplegable.
+- [ ] Probar los imports de Admin/Cliente con Playwright en un preview aislado que reproduzca la raíz de publicación. El test actual confirma las fuentes del paquete, no la ruta del hosting real.
 - [ ] Verificar el scheduler diario en la configuración real de Supabase; la migración no habilita extensiones que no estén instaladas.
 - [ ] Ejecutar regresión end-to-end Admin/Cliente/POS. El POS solo está versionado como referencia y no se modificó.
 - [x] No se aplicó ninguna migración a Supabase; no se creó rama de pago ni se cambió Vercel.
 
-**Estado:** las migraciones, contratos de esquema, pruebas JavaScript y pruebas de comportamiento/concurrencia pasan en PostgreSQL temporal. La certificación integral sigue pendiente de pruebas end-to-end de Admin/Cliente/POS y de verificar el montaje y el scheduler en los entornos reales. No certificada para producción; no fusionar ni desplegar hasta cerrar esos puntos.
+**Estado:** la CI aislada más reciente (ejecución 29) pasa con PostgreSQL temporal y pruebas JS/SQL. La certificación integral sigue pendiente de un entorno Supabase no productivo para probar RPC y reservas, E2E de navegador para Admin/Cliente, regresión funcional del POS y verificación del scheduler. No certificada para producción; no fusionar ni desplegar hasta cerrar esos puntos.
 
 
 - [x] La página Cliente recuperada contenía un bloque JavaScript truncado y fragmentos duplicados detrás de `</html>`; se reconstruyó el bloque de catálogo/reserva preservando la interfaz y se añadió verificación de sintaxis para Admin, Cliente y POS.
