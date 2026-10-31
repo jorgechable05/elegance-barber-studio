@@ -1,0 +1,55 @@
+name: Isolated promotions checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - '.github/workflows/promotions-isolated-tests.yml'
+  push:
+    branches: [feat/servicios-promociones-web]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - '.github/workflows/promotions-isolated-tests.yml'
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: elegance_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d elegance_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: elegance_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run isolated JavaScript tests
+        working-directory: web-promotion-package
+        run: npm test
+      - name: Create minimal existing-schema fixture
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/fixture.sql
+      - name: Apply additive promotion migrations to temporary PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_services_promotions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
+      - name: Assert legacy service compatibility and RPC contracts
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
