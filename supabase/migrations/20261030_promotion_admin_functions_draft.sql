@@ -166,7 +166,7 @@ returns integer
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare v_service record; v_promo_id uuid; v_created integer := 0; v_today date;
 begin
   v_today := (now() at time zone 'America/Merida')::date;
@@ -205,7 +205,7 @@ begin
   end loop;
   return v_created;
 end;
-$;
+$$;
 
 revoke all on function public.barber_promotions_generate_daily_suggestions_internal() from public, anon, authenticated;
 grant execute on function public.barber_promotions_generate_daily_suggestions_internal() to service_role;
