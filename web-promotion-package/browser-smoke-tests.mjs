@@ -131,7 +131,7 @@ window.supabase = {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");
-    if (url.pathname.startsWith("/rpc/")) {
+    if (url.pathname.startsWith("/rest/v1/rpc/") || url.pathname.startsWith("/rpc/")) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       let args = {};
@@ -139,7 +139,9 @@ const server = http.createServer(async (req, res) => {
       const rpcName = decodeURIComponent(url.pathname.split("/").pop());
       observedRpcCalls.push({name:rpcName,args});
       if (useLocalPostgrest) {
-        const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + "/rest/v1" + url.pathname + url.search;
+        // Supabase clients call /rest/v1/rpc/*; standalone PostgREST serves /rpc/*.
+        const upstreamPath = url.pathname.replace(/^\/rest\/v1/, "");
+        const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + upstreamPath + url.search;
         const forwardedBody = Buffer.from(JSON.stringify(args));
         const upstream = await fetch(upstreamUrl, {
           method: req.method,
@@ -169,7 +171,7 @@ const server = http.createServer(async (req, res) => {
     } else if (["/pos","/pos/","/pos.html"].includes(url.pathname)) {
       let html = await readFile(resolve(repoRoot, "web-recovery/pos.html"), "utf8");
       // Rewrite the legacy hard-coded endpoint only in this in-memory test response.
-      const apiUrl = useLocalPostgrest ? process.env.PGRST_URL.replace(/\/$/, "") : appBaseUrl;
+      const apiUrl = appBaseUrl;
       html = html.replaceAll("https://" + productionSupabaseHost, apiUrl)
         .replaceAll("sb_publishable_BMMN_4HJf1JSWKVo-TaxcQ_eG36VtE4", browserApiKey);
       res.writeHead(200, {"content-type":"text/html; charset=utf-8"});
@@ -177,7 +179,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } else if (url.pathname === "/config.js") {
       res.writeHead(200, {"content-type":"text/javascript; charset=utf-8"});
-      const apiUrl = useLocalPostgrest ? process.env.PGRST_URL.replace(/\/$/, "") : mockOrigin;
+      const apiUrl = useLocalPostgrest ? appBaseUrl : mockOrigin;
       res.end('const SUPABASE_URL = ' + JSON.stringify(apiUrl) +
         '; const SUPABASE_KEY = ' + JSON.stringify(browserApiKey) + ';');
       return;
