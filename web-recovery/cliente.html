@@ -151,10 +151,169 @@ async function renderHoras(){
   refreshPromotionOffer();
 }
 
-function initCatalog(){
+async function initCatalog(){
   const ids={'Corte Clásico':1,'Corte Desvanecido':2,'Corte Infantil':3,'Alineación de Ceja':4,'Alineación de Barba':5,'Corte + Masaje':6,'Corte y Lavado de Cabello':7,'VIP':8,'Premium':9};
   document.querySelectorAll('.service').forEach(el=>{if(ids[el.dataset.serv])el.dataset.id=ids[el.dataset.serv];});
   document.querySelectorAll('.barb-btn').forEach(el=>{el.dataset.id=el.dataset.barb==='EdgarMay'?'1':'2';});
+  try {
+    const {data,error}=await db.rpc('barber_services_public');
+    if(!error && Array.isArray(data)){
+      const byId=new Map(data.map(s=>[Number(s.id),s]));
+      document.querySelectorAll('.service').forEach(el=>{
+        const service=byId.get(Number(el.dataset.id));
+        if(!service){el.style.display='none';return;}
+        el.style.display='';
+        el.dataset.price=String(service.price);
+        el.dataset.duration=String(service.duration_minutes);
+        const priceNode=el.querySelector('.price'); if(priceNode) priceNode.textContent='
+}
+function updateServiceAvailability(rows){
+  const list=Array.isArray(rows)?rows:[];
+  document.querySelectorAll('.service').forEach(el=>{
+    const needed=Math.max(1,Math.ceil(Number(el.dataset.duration||30)/30));let available=0;
+    for(let i=0;i<=list.length-needed;i++){let ok=true;for(let j=0;j<needed;j++){if(!list[i+j]||!list[i+j].disponible){ok=false;break;}}if(ok)available++;}
+    const node=el.querySelector('.stock');if(node)node.textContent=available>0?(available===1?'1 espacio disponible':available+' espacios disponibles'):'Sin disponibilidad';el.classList.toggle('low',available===0);
+  });
+}
+
+
+async function refreshPromotionOffer(){
+  const box=document.getElementById('promotionOffer');
+  if(!box) return;
+  selectedPromotion=null; precio=basePrecio;
+  const hora=localStorage.getItem('horaSel');
+  if(!hora){box.style.display='none';return;}
+  try{
+    const [{data,error},utils]=await Promise.all([
+      db.rpc('barber_promotions_public'),
+      import('./web-promotion-package/customer-promotion-utils.js')
+    ]);
+    if(error) throw error;
+    const appointment=new Date(getSelectedDate()+'T'+hora+':00-06:00');
+    const eligible=utils.applicablePromotions(data||[],selectedServiceId,appointment.toISOString());
+    const offers=eligible.map(p=>({promotion:p,price:utils.calculatePromotionPrice(basePrecio,p)})).filter(x=>x.price<basePrecio).sort((a,b)=>a.price-b.price);
+    if(!offers.length){box.style.display='none';return;}
+    selectedPromotion=offers[0].promotion; precio=offers[0].price;
+    box.style.display='block';
+    box.innerHTML='<div style="color:#D4AF37;font-weight:700">PROMOCIÓN DISPONIBLE</div><div style="font-size:12px;color:#ddd;margin-top:5px">'+String(selectedPromotion.title||selectedPromotion.description||'Descuento especial').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</div><div style="margin-top:6px"><span style="color:#888;text-decoration:line-through">
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation_with_promotion',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:'',p_promotion_id:selectedPromotion?.id||null
+  });
+  if(error){alert(error.message.replace(/^.*?: /,'')); await renderHoras(); return;}
+  const msg=`Hola, soy ${nombre}. Quiero reservar ${serv} ${precio} con ${barbero} el ${fecha.toLocaleDateString('es-MX')} a las ${hora}. Tel: ${tel}. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio ${data.id}.`;
+  window.open(`https://wa.me/529851254721?text=${encodeURIComponent(msg)}`,'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML=`<div style="text-align:center">
+    <div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>
+    <div style="font-size:12px;color:#ddd;line-height:1.9">📅 ${fechaTexto}<br>🕐 ${hora}<br>💈 ${barbero}<br>✂️ ${serv}</div>
+    <button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>
+    <div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div>
+  </div>`;
+  confirm.querySelector('button').onclick=()=>{
+    const prueba=`https://wa.me/529851254721?text=${encodeURIComponent('ELEGANCE BARBER STUDIO\\n\\n✅ RESERVA REALIZADA\\n📅 '+fechaTexto+'\\n🕐 '+hora+'\\n💈 '+barbero+'\\n✂️ '+serv)}`;
+    window.open(prueba,'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel'); document.getElementById('nombre').value=''; document.getElementById('tel').value='';
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>+basePrecio+'</span> <b style="color:#10B981;font-size:18px">
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:''
+  });
+  if(error){alert(error.message.replace(/^.*?: /,'')); await renderHoras(); return;}
+  const msg=`Hola, soy ${nombre}. Quiero reservar ${serv} ${precio} con ${barbero} el ${fecha.toLocaleDateString('es-MX')} a las ${hora}. Tel: ${tel}. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio ${data.id}.`;
+  window.open(`https://wa.me/529851254721?text=${encodeURIComponent(msg)}`,'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML=`<div style="text-align:center">
+    <div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>
+    <div style="font-size:12px;color:#ddd;line-height:1.9">📅 ${fechaTexto}<br>🕐 ${hora}<br>💈 ${barbero}<br>✂️ ${serv}</div>
+    <button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>
+    <div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div>
+  </div>`;
+  confirm.querySelector('button').onclick=()=>{
+    const prueba=`https://wa.me/529851254721?text=${encodeURIComponent('ELEGANCE BARBER STUDIO\\n\\n✅ RESERVA REALIZADA\\n📅 '+fechaTexto+'\\n🕐 '+hora+'\\n💈 '+barbero+'\\n✂️ '+serv)}`;
+    window.open(prueba,'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel'); document.getElementById('nombre').value=''; document.getElementById('tel').value='';
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>+precio+'</b></div><div style="font-size:10px;color:#888;margin-top:4px">Aplicable para la fecha, hora y servicio seleccionados.</div>';
+  }catch(error){
+    box.style.display='none';selectedPromotion=null;precio=basePrecio;
+    console.warn('No se pudieron consultar promociones',error);
+  }
+}
+
+async function reservar(){
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:''
+  });
+  if(error){alert(error.message.replace(/^.*?: /,'')); await renderHoras(); return;}
+  const msg=`Hola, soy ${nombre}. Quiero reservar ${serv} ${precio} con ${barbero} el ${fecha.toLocaleDateString('es-MX')} a las ${hora}. Tel: ${tel}. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio ${data.id}.`;
+  window.open(`https://wa.me/529851254721?text=${encodeURIComponent(msg)}`,'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML=`<div style="text-align:center">
+    <div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>
+    <div style="font-size:12px;color:#ddd;line-height:1.9">📅 ${fechaTexto}<br>🕐 ${hora}<br>💈 ${barbero}<br>✂️ ${serv}</div>
+    <button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>
+    <div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div>
+  </div>`;
+  confirm.querySelector('button').onclick=()=>{
+    const prueba=`https://wa.me/529851254721?text=${encodeURIComponent('ELEGANCE BARBER STUDIO\\n\\n✅ RESERVA REALIZADA\\n📅 '+fechaTexto+'\\n🕐 '+hora+'\\n💈 '+barbero+'\\n✂️ '+serv)}`;
+    window.open(prueba,'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel'); document.getElementById('nombre').value=''; document.getElementById('tel').value='';
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>+Number(service.price).toFixed(0);
+        const desc=el.querySelector('.desc'); if(desc) desc.textContent=service.duration_minutes+'m'+(service.description?' • '+service.description:'');
+      });
+      const active=document.querySelector('.service.active');
+      if(active){basePrecio=Number(active.dataset.price);precio=basePrecio;}
+    }
+  } catch(error){ console.warn('No se pudo cargar catálogo administrable',error); }
   genFechas(); renderHoras();
 }
 function updateServiceAvailability(rows){
