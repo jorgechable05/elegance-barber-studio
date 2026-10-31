@@ -6,7 +6,7 @@ returns table (
   id uuid, title text, description text, status text, discount_type text,
   discount_value numeric, starts_at timestamptz, ends_at timestamptz,
   weekdays smallint[], start_time time, end_time time, source text,
-  max_uses integer, uses_count integer, service_ids uuid[]
+  max_uses integer, uses_count integer, service_ids integer[]
 )
 language plpgsql
 stable
@@ -24,7 +24,7 @@ begin
     select p.id, p.title, p.description, p.status, p.discount_type, p.discount_value,
            p.starts_at, p.ends_at, p.weekdays, p.start_time, p.end_time, p.source,
            p.max_uses, p.uses_count,
-           coalesce(array_agg(ps.service_id) filter (where ps.service_id is not null), '{}'::uuid[])
+           coalesce(array_agg(ps.service_id) filter (where ps.service_id is not null), '{}'::integer[])
     from public.barber_promotions p
     left join public.barber_promotion_services ps on ps.promotion_id=p.id
     group by p.id
@@ -37,7 +37,7 @@ create or replace function public.barber_promotion_admin_save(
   p_discount_type text, p_discount_value numeric,
   p_starts_at timestamptz, p_ends_at timestamptz,
   p_weekdays smallint[], p_start_time time, p_end_time time,
-  p_service_ids uuid[], p_max_uses integer
+  p_service_ids integer[], p_max_uses integer
 )
 returns public.barber_promotions
 language plpgsql
@@ -161,5 +161,5 @@ end;
 $$;
 
 grant execute on function public.barber_promotions_admin_list(uuid) to anon, authenticated;
-grant execute on function public.barber_promotion_admin_save(uuid,uuid,text,text,text,numeric,timestamptz,timestamptz,smallint[],time,time,uuid[],integer) to anon, authenticated;
+grant execute on function public.barber_promotion_admin_save(uuid,uuid,text,text,text,numeric,timestamptz,timestamptz,smallint[],time,time,integer[],integer) to anon, authenticated;
 grant execute on function public.barber_promotions_generate_daily_suggestions(uuid) to anon, authenticated;
