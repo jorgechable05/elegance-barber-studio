@@ -173,22 +173,30 @@ async function main() {
   }, "promotion review with invalid Admin session");
   console.log("PASS: reservation RPC consumes the single promotion use and rejects reuse over HTTP");
 
-  // Legacy UI RPCs here are explicitly test-only fixtures. They do not persist sales.
+  // CI-only POS RPC fixture writes into disposable tables; verify persistence over HTTP.
   const reservations = await rpc("barber_admin_reservations", {p_token:token});
   const sales = await rpc("barber_admin_sales", {p_token:token});
   assert.deepEqual(reservations, []);
   assert.deepEqual(sales, []);
   const posResult = await rpc("barber_admin_create_walkin_sale", {
-    p_token: token,
-    p_cliente: "Cliente QA HTTP local",
-    p_servicio_id: 1,
-    p_barbero_id: 1,
-    p_metodo: "Efectivo",
-    p_recibido: 160,
+    p_token:token, p_cliente:"Cliente QA HTTP local", p_servicio_id:1, p_barbero_id:1,
+    p_metodo:"Mixto", p_recibido:160, p_efectivo:100, p_tarjeta:60,
   });
-  assert.equal(posResult.folio, "QA-WALKIN-HTTP-001");
-  assert.equal(Number(posResult.total), 160);
-  console.log("PASS: legacy Admin/POS HTTP endpoints route correctly through CI-only no-write fixtures");
+  assert.match(posResult.folio, /^QA-WALKIN-/);
+  assert.equal(Number(posResult.total),160);
+  assert.equal(Number(posResult.efectivo),100);
+  assert.equal(Number(posResult.tarjeta),60);
+  const persistedSales = await rpc("barber_admin_sales", {p_token:token});
+  assert.equal(persistedSales.length,1,"POS sale must be persisted and readable");
+  assert.equal(persistedSales[0].folio,posResult.folio);
+  assert.equal(Number(persistedSales[0].total),160);
+  assert.equal(Number(persistedSales[0].efectivo),100);
+  assert.equal(Number(persistedSales[0].tarjeta),60);
+  await expectRpcFailure("barber_admin_create_walkin_sale", {
+    p_token:token,p_cliente:"Invalid mixed payment",p_servicio_id:1,p_barbero_id:1,
+    p_metodo:"Mixto",p_recibido:160,p_efectivo:100,p_tarjeta:50,
+  },"mixed payment split not equal to total");
+  console.log("PASS: POS HTTP write/read persistence, mixed payment split, invalid-split rejection");
   console.log("PASS: all calls above used local PostgREST + temporary PostgreSQL, never hosted Supabase");
 }
 
