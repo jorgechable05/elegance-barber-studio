@@ -2,5 +2,7 @@
   "name": "elegance-barber-promotion-package",
   "private": true,
   "type": "module",
-  "scripts": { "test": "TZ=America/Merida node --test *.test.mjs smoke-tests.mjs" }
+  "scripts": {
+    "test": "TZ=America/Merida node --test *.test.mjs smoke-tests.mjs && node check-recovered-html.mjs"
+  }
 }

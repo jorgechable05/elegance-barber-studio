@@ -20,3 +20,6 @@
 - [ ] No se aplicó ninguna migración a Supabase ni se creó rama de pago ni se cambió Vercel.
 
 **Estado:** las migraciones y contratos de esquema pasaron en PostgreSQL temporal; las pruebas añadidas de comportamiento/concurrencia y la regresión end-to-end siguen pendientes de resultado. No certificada para producción. No fusionar ni desplegar hasta cerrar los puntos anteriores.
+
+
+- [x] La página Cliente recuperada contenía un bloque JavaScript truncado y fragmentos duplicados detrás de `</html>`; se reconstruyó el bloque de catálogo/reserva preservando la interfaz y se añadió verificación de sintaxis para Admin, Cliente y POS.
