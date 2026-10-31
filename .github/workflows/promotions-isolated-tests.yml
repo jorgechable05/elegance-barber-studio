@@ -96,7 +96,7 @@ jobs:
           PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
         run: node rpc-http-integration-tests.mjs
       - name: Assert and clean local HTTP RPC records
-        if: always()
+        if: success()
         run: |
           if docker inspect postgrest-rpc-test >/dev/null 2>&1; then
             psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_http_integration.sql
