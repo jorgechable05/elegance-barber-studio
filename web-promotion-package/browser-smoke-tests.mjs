@@ -77,6 +77,14 @@ function rpcFixture(name, args = {}) {
   }
 }
 
+async function waitForRpcCall(name, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!calls.some(call => call.name === name) && Date.now() < deadline) {
+    await new Promise(resolveWait => setTimeout(resolveWait, 25));
+  }
+  assert.ok(calls.some(call => call.name === name), "Timed out waiting for mocked RPC " + name);
+}
+
 const mimeTypes = {
   ".js":"text/javascript; charset=utf-8",
   ".mjs":"text/javascript; charset=utf-8",
