@@ -345,8 +345,8 @@ async function main() {
     await pos.locator("#p").fill("local-qa-password-not-a-credential");
     await pos.locator("#go").click();
     await pos.locator("#app").waitFor({state:"visible"});
-    const printCss = (await pos.locator("style").allTextContents()).join("\\n");
-    assert.match(printCss, /@page\\s*\\{[^}]*size:\\s*58mm auto/i,
+    const printCss = (await pos.locator("style").allTextContents()).join("\n");
+    assert.match(printCss, /@page\s*\{[^}]*size:\s*58mm auto/i,
       "POS receipt must retain its 58mm thermal print layout");
     const methods = ["Efectivo", "Transferencia", "Tarjeta", "Mixto"];
     const methodOptions = await pos.locator("#wmethod option").allTextContents();
