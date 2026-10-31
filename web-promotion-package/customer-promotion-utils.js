@@ -45,7 +45,7 @@ function parseMinutes(value) {
 }
 
 /**
- * Always calculate from the base catalog price. Returns exact cents.
+ * Returns the reservation amount in whole MXN pesos, matching reservas.precio INTEGER.
  * Caller must persist the agreed appointment price at booking time; it must never
  * recalculate already-confirmed reservations from a changed catalog/promotion.
  */
@@ -65,7 +65,9 @@ export function calculatePromotionPrice(basePrice, promotion) {
   } else {
     throw new TypeError("Tipo de promoción desconocido");
   }
-  return Math.round((result + Number.EPSILON) * 100) / 100;
+  // Prices persisted by the legacy reservation table are whole pesos. PostgreSQL
+  // round(numeric) rounds non-negative .5 values away from zero, as Math.round does.
+  return Math.round(result);
 }
 
 export function applicablePromotions(promotions, serviceId, appointmentDateTime) {

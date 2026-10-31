@@ -54,3 +54,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261031_reservation_promotion_compat.sql
       - name: Assert legacy service compatibility and RPC contracts
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
+      - name: Verify price rounding and admin-session guards
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_behavior.sql
+      - name: Verify single-use promotion under concurrent reservations
+        run: bash supabase/tests/assert_concurrent_uses.sh

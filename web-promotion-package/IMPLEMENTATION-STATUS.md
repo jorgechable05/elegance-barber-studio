@@ -11,11 +11,12 @@
 - [x] Abierto PR de borrador #1, no fusionado: https://github.com/jorgechable05/elegance-barber-studio/pull/1
 
 ## Pendiente de validación
-- [ ] Esperar/inspeccionar el resultado del workflow CI y corregir cualquier fallo SQL/JavaScript.
-- [ ] Revisar el cálculo de importes con centavos: la columna heredada `reservas.precio` es integer; por compatibilidad, la RPC redondea el precio final a pesos enteros.
+- [x] Corregido el delimitador SQL de la función interna de sugerencias; las ejecuciones 12 y 13 del workflow pasaron con JS, migraciones temporales y aserciones de esquema.
+- [ ] Ejecutar nuevas pruebas de comportamiento para redondeo, límites de uso y sesiones vencidas/revocadas; la regresión concurrente aún requiere resultado CI.
+- [x] Definida la regla compatible de importe: `reservas.precio` conserva pesos enteros y la vista calcula el mismo redondeo para que el importe guardado coincida con lo mostrado.
 - [ ] Revisar que el montaje de Admin funciona en la ruta y el hosting real cuando el código web esté versionado como raíz desplegable.
 - [ ] Verificar el scheduler diario en la configuración real de Supabase; la migración no habilita extensiones que no estén instaladas.
 - [ ] Ejecutar regresión end-to-end Admin/Cliente/POS. El POS solo está versionado como referencia y no se modificó.
 - [ ] No se aplicó ninguna migración a Supabase ni se creó rama de pago ni se cambió Vercel.
 
-**Estado:** integración en rama y pendiente de CI; no certificada para producción. No fusionar ni desplegar hasta cerrar los puntos anteriores.
+**Estado:** las migraciones y contratos de esquema pasaron en PostgreSQL temporal; las pruebas añadidas de comportamiento/concurrencia y la regresión end-to-end siguen pendientes de resultado. No certificada para producción. No fusionar ni desplegar hasta cerrar los puntos anteriores.

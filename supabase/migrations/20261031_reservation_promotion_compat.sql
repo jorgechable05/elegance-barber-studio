@@ -24,6 +24,7 @@ declare
   v_servicio text;
   v_base_price numeric(10,2);
   v_final_price integer;
+  v_uses_count integer;
   v_promo public.barber_promotions;
   v_start_at timestamptz;
   v_weekday smallint;
@@ -56,6 +57,8 @@ begin
        and lower(coalesce(r.estado,'pendiente')) not in ('rechazada','cancelada','atendida')
   ) then raise exception 'Ese horario ya fue reservado'; end if;
 
+  -- Legacy reservas.precio is INTEGER: the booking price contract is whole MXN pesos.
+  -- The customer utility uses the same PostgreSQL-compatible rounding rule.
   v_final_price := round(v_base_price)::integer;
   if p_promotion_id is not null then
     select p.* into v_promo
@@ -89,7 +92,18 @@ begin
   ) returning id into v_id;
 
   if p_promotion_id is not null then
-    update public.barber_promotions set uses_count=uses_count+1,updated_at=now() where id=p_promotion_id;
+    -- Keep the row lock held above and re-check the limit in the UPDATE as a
+    -- second guard. If a competing transaction has consumed the last use, the
+    -- reservation insert and counter update are rolled back together.
+    update public.barber_promotions
+       set uses_count=uses_count+1, updated_at=now()
+     where id=p_promotion_id
+       and status='approved'
+       and (max_uses is null or uses_count < max_uses)
+     returning uses_count into v_uses_count;
+    if not found then
+      raise exception 'La promoción ya alcanzó su límite de usos';
+    end if;
   end if;
   return v_id;
 end;
