@@ -11,7 +11,7 @@ jobs:
   deployed-preview:
     runs-on: ubuntu-latest
     env:
-      PREVIEW_URL: https://elegance-barber-piste-ppesleqlp-dell-723c.vercel.app
+      PREVIEW_URL: https://elegance-barber-piste-g8njzuafo-dell-723c.vercel.app
     steps:
       - uses: actions/checkout@v4
         with:
