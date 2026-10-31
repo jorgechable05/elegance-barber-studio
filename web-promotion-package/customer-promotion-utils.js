@@ -15,7 +15,8 @@ export function isPromotionApplicable(promotion, serviceId, appointmentDateTime)
   const allowedServices = (promotion.service_ids || []).map(String);
   if (!allowedServices.includes(String(serviceId))) return false;
 
-  const zonedParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Merida", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(when);\n  const parts = Object.fromEntries(zonedParts.map(part => [part.type, part.value]));\n  const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const zonedParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Merida", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(when);
+  const parts = Object.fromEntries(zonedParts.map(part => [part.type, part.value]));\n  const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   const weekday = weekdayMap[parts.weekday];
   if (Array.isArray(promotion.weekdays) && promotion.weekdays.length &&
       !promotion.weekdays.map(Number).includes(weekday)) return false;
