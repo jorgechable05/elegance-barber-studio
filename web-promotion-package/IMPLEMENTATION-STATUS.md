@@ -1,21 +1,21 @@
 # Estado de implementación (actualizado 2026-10-31)
 
-## Verificado
-- [x] Rama de trabajo aislada; los cambios están en `feat/servicios-promociones-web`, no en `main`.
-- [x] Se añadió paquete separado para futura integración: adaptador Admin, reglas de elegibilidad/cálculo y pruebas unitarias.
-- [x] La sintaxis de los módulos JavaScript aislados pasa `node --check`.
-- [x] Se consultaron las rutas públicas actuales: `/admin`, `/cliente` y `/pos` responden HTTP 200.
-- [x] Se inspeccionó la definición SQL real de `barber_create_reservation`: el precio y nombre se obtienen de una tabla `VALUES` con nueve IDs numéricos y se guardan en `reservas`; no se debe cambiar a UUID ni confiar en precio de navegador.
-- [x] Se inspeccionó `barber_admin_create_walkin_sale`: también usa su propio catálogo numérico y guarda el importe en `barber_sales`; queda fuera del alcance hasta diseñar compatibilidad sin afectar POS.
-- [x] Las migraciones borrador aún no están aplicadas.
+## Comprobaciones realizadas
+- [x] La rama de trabajo permanece separada de `main`.
+- [x] Paquete Admin de servicios/promociones y utilidades de aplicabilidad/precio añadidos por separado.
+- [x] Las rutas productivas `/admin`, `/cliente` y `/pos` responden HTTP 200 en comprobación de lectura.
+- [x] Inspeccionada la RPC real `barber_create_reservation`: toma `p_servicio_id` como entero 1–9, obtiene nombre/precio de un catálogo `VALUES` incorporado a la función y guarda el importe en `reservas`.
+- [x] Inspeccionada `barber_admin_create_walkin_sale`: usa su propio catálogo numérico fijo; POS no debe cambiarse sin una prueba específica.
+- [x] Los borradores SQL aún no se aplican.
+- [x] Pruebas unitarias de utilidades ejecutadas en Node 22 con `TZ=America/Merida`: 7/7 pasan tras validar manualmente la lógica de zona horaria.
 
-## Bloqueos
-- [ ] No se creó rama de desarrollo Supabase. La herramienta cotizó US$0.01344 por hora y requiere confirmación de costo; no se continúa sin autorización expresa.
-- [ ] El repositorio tiene wrapper Android pero no la fuente web original versionada de `/admin`, `/cliente`, `/pos`.
-- [ ] La suite del paquete necesita ejecutarse en un runtime habilitado y con la zona `America/Merida`; no equivale a pruebas E2E con Supabase.
-- [ ] Es necesario diseñar una capa de catálogo compatible o modificar cuidadosamente la RPC para usar servicios administrables, y asegurar que las ventas de mostrador usan el mismo precio promocional correcto si se requiere, sin cambiar el flujo POS actual.
-- [ ] El cliente debe obtener promociones para la hora de cita seleccionada; el cálculo y el importe deben validarse y persistirse atómicamente en el backend.
-- [ ] La función de sugerencias diarias actual requiere token de sesión; el scheduler necesita una función interna restringida no ejecutable por anon/authenticated.
-- [ ] Ejecutar regresión completa y pruebas de extremo a extremo tras integrar.
+## Bloqueos de integración
+- [ ] Este repositorio contiene un wrapper Android, pero no la fuente web original versionada de `/admin`, `/cliente` ni `/pos`.
+- [ ] La herramienta de Supabase informa un costo de US$0.01344 por hora para crear una rama de desarrollo; requiere confirmación de costo antes de poder probar migraciones aisladas.
+- [ ] Hay que resolver la clave de compatibilidad entre servicios UUID nuevos e IDs numéricos 1–9 antes de conectar catálogo y reservas.
+- [ ] El descuento debe validarse y guardarse transaccionalmente en backend al crear una reserva; no debe confiarse en el navegador.
+- [ ] Debe resolverse si los precios de reserva admiten centavos: `reservas.precio` es `integer` en la base actual, mientras que el helper de promociones calcula dos decimales.
+- [ ] El generador diario de sugerencias de borrador requiere un token interactivo; un scheduler necesita una función interna segura, no ejecutable por usuarios anónimos.
+- [ ] Ejecutar regresión Admin/Cliente/POS completa con entorno aislado y pruebas de extremo a extremo.
 
-**No desplegar a producción.** No se han aplicado migraciones, no se modificó Vercel y no se cambió el POS.
+**No desplegar a producción.** No se aplicaron migraciones, no se cambió el despliegue Vercel y no se modificó POS.
