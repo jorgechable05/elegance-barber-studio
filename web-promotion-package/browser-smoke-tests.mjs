@@ -115,7 +115,7 @@ window.supabase = {
   createClient: function (url, key) {
     return {
       rpc: async function (name, args) {
-        const response = await fetch(url + "/rest/v1/rpc/" + name, {
+        const response = await fetch(url + "/rpc/" + name, {
           method: "POST",
           headers: { apikey: key, authorization: "Bearer " + key, "content-type": "application/json" },
           body: JSON.stringify(args || {})
@@ -131,7 +131,7 @@ window.supabase = {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");
-    if (url.pathname.startsWith("/rest/v1/rpc/")) {
+    if (url.pathname.startsWith("/rpc/")) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       let args = {};
@@ -139,7 +139,7 @@ const server = http.createServer(async (req, res) => {
       const rpcName = decodeURIComponent(url.pathname.split("/").pop());
       observedRpcCalls.push({name:rpcName,args});
       if (useLocalPostgrest) {
-        const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + url.pathname + url.search;
+        const upstreamUrl = process.env.PGRST_URL.replace(/\/$/, "") + "/rest/v1" + url.pathname + url.search;
         const forwardedBody = Buffer.from(JSON.stringify(args));
         const upstream = await fetch(upstreamUrl, {
           method: req.method,
@@ -217,7 +217,7 @@ function installNetworkStubs(page) {
     if (request.url().includes(productionSupabaseHost)) productionRequests.push(request.url());
     try {
       const requestUrl = new URL(request.url());
-      const match = requestUrl.pathname.match(/\/rpc\/([^/]+)$/);
+      const match = requestUrl.pathname.match(/\/(?:rest\/v1\/)?rpc\/([^/]+)$/);
       if (match && request.method() === "POST") {
         let args = {};
         try { args = request.postDataJSON() || {}; } catch {}
