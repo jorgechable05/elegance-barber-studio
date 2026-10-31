@@ -45,6 +45,15 @@ jobs:
       - name: Run isolated JavaScript tests
         working-directory: web-promotion-package
         run: npm test
+      - name: Install pinned Playwright for isolated browser tests
+        working-directory: web-promotion-package
+        run: npm install --no-save --no-package-lock playwright@1.64.1
+      - name: Install Chromium for browser tests
+        working-directory: web-promotion-package
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests with mocked backend only
+        working-directory: web-promotion-package
+        run: node browser-smoke-tests.mjs
       - name: Create minimal existing-schema fixture
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/fixture.sql
       - name: Apply additive promotion migrations to temporary PostgreSQL
