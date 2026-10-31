@@ -1,31 +1,31 @@
 # Estado de implementación (actualizado 2026-10-31)
 
-## Avance sin crear infraestructura de pago
-- [x] Recuperadas en la rama aislada las fuentes actuales de `/admin`, `/cliente` y `/pos` bajo `web-recovery/`; no se modificó el despliegue.
-- [x] Añadido al Admin recuperado un acceso separado a Servicios y Promociones, reutilizando el login/token actual y el adaptador de RPC. La agenda existente queda intacta por defecto.
-- [x] El cliente recuperado consulta el catálogo administrable, muestra solo servicios activos y calcula la oferta aprobada aplicable a la fecha/hora/servicio seleccionados.
-- [x] Añadida RPC aditiva `barber_create_reservation_with_promotion`: valida promoción aprobada en servidor, servicio, fecha, hora, usos y precio; conserva el importe en la reserva y no recalcula citas existentes. La RPC antigua permanece.
-- [x] Los IDs de servicio permanecen numéricos 1–9 y el catálogo inicial conserva nombres y precios históricos conocidos.
-- [x] La función de sugerencias diarias para scheduler queda restringida a `service_role`; el script intenta programarla solo si `pg_cron` ya existe.
-- [x] Preparado workflow de GitHub Actions con PostgreSQL temporal para probar migraciones y contratos sin crear rama de Supabase de pago.
-- [x] Abierto PR de borrador #1, no fusionado: https://github.com/jorgechable05/elegance-barber-studio/pull/1
+## Avances comprobados en rama aislada
+- [x] Recuperadas las fuentes de `/admin`, `/cliente` y `/pos` bajo `web-recovery/`; no se modificó el despliegue.
+- [x] Añadido al Admin recuperado un acceso separado a Servicios y Promociones, sin alterar la agenda existente por defecto.
+- [x] El cliente recuperado consulta servicios activos y ofertas aprobadas, y envía la selección a la RPC de reserva del servidor sin confiar en un precio enviado por el navegador.
+- [x] Conservados los IDs numéricos de servicio 1–9 y el importe histórico entero de `reservas.precio`.
+- [x] La función interna de sugerencias diarias queda restringida a `service_role`; el SQL intenta programar `pg_cron` solo si la extensión ya está disponible.
+- [x] POS recuperado: se agregaron campos separados para efectivo y tarjeta cuando se elige `Mixto`, validación para que ambos sumen exactamente el total, y desglose visible en el ticket térmico de 58 mm.
+- [x] La fixture CI exclusiva de PostgreSQL temporal ahora persiste ventas y pagos sintéticos, permite volver a leer las ventas y rechaza el desglose mixto incorrecto. La fixture está prohibida para bases alojadas.
+- [x] GitHub Actions ahora activa las pruebas cuando cambian las páginas recuperadas del POS.
+- [x] PR #1 sigue abierto como borrador, no fusionado: https://github.com/jorgechable05/elegance-barber-studio/pull/1
 
-## Pendiente de validación
-- [x] Corregido el delimitador SQL de la función interna de sugerencias; las ejecuciones 12 y 13 del workflow pasaron con JS, migraciones temporales y aserciones de esquema.
-- [x] Pruebas de comportamiento y concurrencia completadas en GitHub Actions: redondeo de importes, límite de usos, promociones pendientes, sesiones vencidas/revocadas y dos reservas simultáneas con un solo uso disponible. Ejecución final anterior: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41209259949.
-- [x] Validación aislada de SQL/JavaScript verificada en la ejecución 40: pruebas JavaScript, análisis sintáctico de las tres vistas, migraciones en PostgreSQL temporal, contratos, permisos/sesiones y concurrencia pasaron: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41210225486.
-- [x] Pruebas de navegador con Playwright y RPC simuladas: Admin monta el panel, Cliente muestra la promoción aprobada y llama a la RPC de reserva, y POS recorre venta de mostrador hasta ticket. Se comprobó que no hubo peticiones al Supabase de producción. Ejecución PR: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41210230447.
-- [x] Definida la regla compatible de importe: `reservas.precio` conserva pesos enteros y la vista calcula el mismo redondeo para que el importe guardado coincida con lo mostrado.
-- [x] Probar en un servidor local aislado el montaje de los módulos relativos de Admin y Cliente; los smoke tests de Playwright pasan con mocks.
-- [ ] Probar las rutas reales de publicación en un preview aislado de Vercel. La comprobación de producción fue solo GET de lectura: `/admin`, `/cliente` y `/pos` responden 200, pero aún no incluyen los módulos de promociones.
-- [ ] Verificar el scheduler diario en una base de datos no productiva de Elegance: la CI confirma permisos e idempotencia de la función sobre PostgreSQL temporal, pero no demuestra que pg_cron esté instalado/activo ni que el job exista en Supabase.
-- [ ] Ejecutar integración real contra un proyecto Supabase no productivo de Elegance para aprobar/rechazar promociones, crear reservas y validar los permisos reales. No se identificó un proyecto separado de Elegance para pruebas; no reutilizar el backend activo.
-- [ ] Completar regresión real del POS contra un backend no productivo: persistencia y consulta de ventas, pagos por separado y mixtos, cierre/resultado de cobro y ticket térmico 58 mm. CI valida la UI y presencia de métodos, pero el RPC de mostrador actual es un fixture sin escritura; no hubo ventas reales. El POS recuperado solo presenta un campo de importe recibido, por lo que la distribución efectivo/tarjeta del pago mixto aún no está demostrada.
-- [x] No se aplicó ninguna migración a Supabase; no se creó rama de pago ni se cambió Vercel.
+## Última ejecución automatizada
+- [x] JavaScript unitario y análisis sintáctico de las vistas.
+- [x] Playwright con backend simulado, sin peticiones al Supabase de producción.
+- [x] Migraciones y contratos sobre PostgreSQL temporal.
+- [x] Integración HTTP de RPC con PostgREST local.
+- [x] Flujo de navegador contra PostgREST local y verificación/limpieza de la reserva creada.
+- [x] Contratos del scheduler, permisos e idempotencia en PostgreSQL temporal.
+- [x] Prueba concurrente de promoción de uso único.
+- [x] Resultado de la ejecución aislada: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41242485408
 
-**Estado actualizado 2026-10-31:** la ejecución CI #100 pasó: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41218308256. Además de JavaScript, migraciones y contratos SQL, pasó Playwright contra PostgREST temporal, HTTP RPC, comprobación de permisos e idempotencia del generador diario, aserciones/limpieza de reservas y prueba concurrente de uso único. Esto certifica las pruebas aisladas del repositorio, no la configuración ni los datos de Supabase real.
+## Bloqueos para certificar producción
+- [ ] **Contrato real del POS:** el backend real no está versionado en este repositorio y no se confirmó que `barber_admin_create_sale` ni `barber_admin_create_walkin_sale` acepten `p_efectivo` y `p_tarjeta`. La prueba actual demuestra persistencia y lectura solo en el fixture de CI; no equivale a una venta persistida en Supabase. No desplegar el cambio de pagos mixtos hasta alinear y probar la RPC real en un entorno no productivo.
+- [ ] **Supabase no productivo:** no se identificó un proyecto de pruebas separado de Elegance. No usar `elegance-piste`, no aplicar migraciones ni ejecutar ventas reales hasta identificar/autorizar el entorno aislado.
+- [ ] **Scheduler en Supabase:** CI prueba la función e idempotencia en PostgreSQL temporal, pero no demuestra que `pg_cron` esté instalado/activo ni que exista el trabajo diario en una instancia de Supabase.
+- [ ] **Preview de Vercel:** falta probar la publicación aislada. No publicar el POS recuperado en preview mientras conserve el endpoint del proyecto activo en el HTML; primero debe configurarse para exigir un endpoint de prueba, evitando que una vista previa pueda escribir en producción.
+- [x] No se aplicaron migraciones a Supabase, no se creó rama/proyecto de pago y no se cambió Vercel.
 
-**Pendiente para certificación integral:** no se identificó un proyecto Supabase no productivo separado para Elegance. Solo se encontró el proyecto elegance-piste activo; no se consultó ni modificó, para evitar tocar producción. No se ha aplicado ninguna migración ni creado una rama/proyecto con costo. Falta comprobar pg_cron y su job en una instancia no productiva de Elegance, y ejecutar regresión del POS con RPC reales que escriban en la base de prueba. También falta probar la publicación en un preview aislado que incluya los módulos nuevos. No certificado para producción; no fusionar ni desplegar.
-
-
-- [x] La página Cliente recuperada contenía un bloque JavaScript truncado y fragmentos duplicados detrás de `</html>`; se reconstruyó el bloque de catálogo/reserva preservando la interfaz y se añadió verificación de sintaxis para Admin, Cliente y POS.
+**Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** Mantener PR #1 en borrador; no fusionar ni desplegar hasta resolver los bloqueos anteriores.
