@@ -174,12 +174,19 @@ declare
   v_today date;
   v_lock_key bigint := hashtext('elegance-promotion-scheduler')::bigint;
 begin
-  -- Prevent overlapping scheduler invocations from creating duplicates.
+  -- Serialize this job and skip today's run if any daily suggestions already exist.
   perform pg_advisory_xact_lock(v_lock_key);
   v_today := (now() at time zone 'America/Merida')::date;
 
-  -- Treat any suggestion for a service today as satisfying the daily run,
-  -- including suggestions still pending review, approved, or rejected.
+  if exists (
+    select 1
+    from public.barber_promotions p
+    where p.source = 'daily_suggestion'
+      and (p.created_at at time zone 'America/Merida')::date = v_today
+  ) then
+    return 0;
+  end if;
+
   for v_service in
     select s.id, s.name
     from public.barber_services s
@@ -190,14 +197,6 @@ begin
         join public.barber_promotions p on p.id=ps.promotion_id
         where ps.service_id=s.id and p.status='approved'
           and p.starts_at < now()+interval '24 hours' and p.ends_at > now()
-      )
-      and not exists (
-        select 1
-        from public.barber_promotion_services ps
-        join public.barber_promotions p on p.id=ps.promotion_id
-        where ps.service_id=s.id
-          and p.source='daily_suggestion'
-          and (p.created_at at time zone 'America/Merida')::date=v_today
       )
     order by s.display_order, s.name
     limit 3
