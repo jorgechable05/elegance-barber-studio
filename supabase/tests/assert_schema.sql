@@ -1,0 +1,24 @@
+\set ON_ERROR_STOP on
+DO $$
+DECLARE n integer; bad integer;
+BEGIN
+  SELECT count(*) INTO n FROM public.barber_services;
+  IF n <> 9 THEN RAISE EXCEPTION 'Expected 9 legacy service IDs, got %', n; END IF;
+  SELECT count(*) INTO bad FROM public.barber_services
+    WHERE id NOT BETWEEN 1 AND 9 OR price < 0 OR duration_minutes < 5;
+  IF bad <> 0 THEN RAISE EXCEPTION 'Invalid seeded services: %', bad; END IF;
+  IF (SELECT price FROM public.barber_services WHERE id=1) <> 160 THEN
+    RAISE EXCEPTION 'Legacy service 1 price changed';
+  END IF;
+  IF (SELECT price FROM public.barber_services WHERE id=9) <> 550 THEN
+    RAISE EXCEPTION 'Legacy service 9 price changed';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                 WHERE n.nspname='public' AND p.proname='barber_promotions_public') THEN
+    RAISE EXCEPTION 'Public promotion RPC missing';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                 WHERE n.nspname='public' AND p.proname='barber_promotion_admin_save') THEN
+    RAISE EXCEPTION 'Admin promotion save RPC missing';
+  END IF;
+END $$;
