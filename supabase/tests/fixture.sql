@@ -1,6 +1,7 @@
 -- Minimal PostgreSQL contract fixture for CI; never connected to production.
 create role anon nologin;
 create role authenticated nologin;
+create role service_role nologin;
 create table public.barber_admin_sessions (
   token uuid primary key,
   username text not null default 'ci',
