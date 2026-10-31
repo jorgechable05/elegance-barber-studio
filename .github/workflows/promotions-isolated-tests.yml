@@ -67,6 +67,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
       - name: Verify price rounding and admin-session guards
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_behavior.sql
+      - name: Validate isolated scheduler permissions and idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_scheduler_contract.sql
       - name: Start local PostgREST API for RPC integration
         env:
           PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
