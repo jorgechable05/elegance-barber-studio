@@ -169,14 +169,16 @@ const server = http.createServer(async (req, res) => {
     } else if (["/pos","/pos/","/pos.html"].includes(url.pathname)) {
       let html = await readFile(resolve(repoRoot, "web-recovery/pos.html"), "utf8");
       // Rewrite the legacy hard-coded endpoint only in this in-memory test response.
-      html = html.replaceAll("https://" + productionSupabaseHost, appBaseUrl)
+      const apiUrl = useLocalPostgrest ? process.env.PGRST_URL.replace(/\/$/, "") : appBaseUrl;
+      html = html.replaceAll("https://" + productionSupabaseHost, apiUrl)
         .replaceAll("sb_publishable_BMMN_4HJf1JSWKVo-TaxcQ_eG36VtE4", browserApiKey);
       res.writeHead(200, {"content-type":"text/html; charset=utf-8"});
       res.end(html);
       return;
     } else if (url.pathname === "/config.js") {
       res.writeHead(200, {"content-type":"text/javascript; charset=utf-8"});
-      res.end('const SUPABASE_URL = ' + JSON.stringify(useLocalPostgrest ? appBaseUrl : mockOrigin) +
+      const apiUrl = useLocalPostgrest ? process.env.PGRST_URL.replace(/\/$/, "") : mockOrigin;
+      res.end('const SUPABASE_URL = ' + JSON.stringify(apiUrl) +
         '; const SUPABASE_KEY = ' + JSON.stringify(browserApiKey) + ';');
       return;
     } else if (url.pathname === "/sw.js") {
