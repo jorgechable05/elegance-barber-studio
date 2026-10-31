@@ -101,6 +101,17 @@ jobs:
           if docker inspect postgrest-rpc-test >/dev/null 2>&1; then
             psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_http_integration.sql
           fi
+      - name: Seed approved promotion for isolated browser-to-RPC test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/seed_browser_promotion.sql
+      - name: Run Playwright against local PostgREST RPC
+        working-directory: web-promotion-package
+        env:
+          PGRST_URL: http://127.0.0.1:3000
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: node browser-smoke-tests.mjs
+      - name: Assert and clean browser-created reservation
+        if: success()
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_browser_integration.sql
       - name: Stop local PostgREST API
         if: always()
         run: docker rm --force postgrest-rpc-test || true
