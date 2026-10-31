@@ -21,4 +21,12 @@ BEGIN
                  WHERE n.nspname='public' AND p.proname='barber_promotion_admin_save') THEN
     RAISE EXCEPTION 'Admin promotion save RPC missing';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                 WHERE n.nspname='public' AND p.proname='barber_create_reservation_with_promotion') THEN
+    RAISE EXCEPTION 'Compatible reservation-with-promotion RPC missing';
+  END IF;
+  IF has_function_privilege('anon','public.barber_promotions_generate_daily_suggestions_internal()','EXECUTE')
+     OR has_function_privilege('authenticated','public.barber_promotions_generate_daily_suggestions_internal()','EXECUTE') THEN
+    RAISE EXCEPTION 'Internal daily suggestion function is exposed to client roles';
+  END IF;
 END $$;
