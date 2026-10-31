@@ -92,7 +92,24 @@ begin
 end;
 $$;
 
+create or replace function public.barber_public_schedule(p_fecha date, p_barbero_id integer)
+returns table (hora text, disponible boolean)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select h.hora, true
+  from unnest(array[
+    '13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00',
+    '17:30','18:00','18:30','19:00','19:30','20:00','20:30'
+  ]::text[]) as h(hora)
+  where p_fecha is not null and p_barbero_id in (1,2)
+  order by h.hora;
+$;
+
 grant execute on function public.barber_admin_login(text,text) to anon, authenticated;
+grant execute on function public.barber_public_schedule(date,integer) to anon, authenticated;
 grant execute on function public.barber_admin_reservations(uuid) to anon, authenticated;
 grant execute on function public.barber_admin_sales(uuid) to anon, authenticated;
 grant execute on function public.barber_admin_create_walkin_sale(uuid,text,integer,integer,text,numeric) to anon, authenticated;
