@@ -25,6 +25,18 @@ BEGIN
                  WHERE n.nspname='public' AND p.proname='barber_create_reservation_with_promotion') THEN
     RAISE EXCEPTION 'Compatible reservation-with-promotion RPC missing';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='barber_sales' AND column_name='efectivo')
+     OR NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='barber_sales' AND column_name='tarjeta') THEN
+    RAISE EXCEPTION 'Payment split columns missing';
+  END IF;
+  IF to_regprocedure('public.barber_admin_create_sale(uuid,uuid,text,numeric,numeric,numeric)') IS NULL THEN
+    RAISE EXCEPTION 'Mixed-payment reservation RPC overload missing';
+  END IF;
+  IF to_regprocedure('public.barber_admin_create_walkin_sale(uuid,text,integer,integer,text,numeric,numeric,numeric)') IS NULL THEN
+    RAISE EXCEPTION 'Mixed-payment walk-in RPC overload missing';
+  END IF;
   IF has_function_privilege('anon','public.barber_promotions_generate_daily_suggestions_internal()','EXECUTE')
      OR has_function_privilege('authenticated','public.barber_promotions_generate_daily_suggestions_internal()','EXECUTE') THEN
     RAISE EXCEPTION 'Internal daily suggestion function is exposed to client roles';
