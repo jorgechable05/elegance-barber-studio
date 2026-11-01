@@ -463,7 +463,7 @@ begin
   end if;
   return v_reservation;
 end;
-$;
+$$;
 
 -- Single atomic walk-in package checkout; payment split is computed against package price,
 -- and service-level sale items preserve the actual allocation and cost snapshot.
