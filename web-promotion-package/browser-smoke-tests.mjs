@@ -64,6 +64,11 @@ function rpcFixture(name, args = {}) {
     case "barber_admin_login":
       return {token:"mock-session-for-browser-tests"};
     case "barber_admin_reservations":
+      return useLocalPostgrest ? [] : [{
+        id:"qa-reservation-mixed-001", nombre:"Cliente QA reserva", telefono:"9990000000",
+        servicio:"Corte Clásico", precio:160, barbero:"EdgarMay", hora:"13:30",
+        estado:"confirmada", fecha:"2026-11-02"
+      }];
     case "barber_admin_sales":
     case "barber_promotions_admin_list":
       return [];
@@ -80,6 +85,8 @@ function rpcFixture(name, args = {}) {
       return {id:"QA-RESERVATION-001",precio:144};
     case "barber_admin_create_walkin_sale":
       return {folio:"QA-WALKIN-001",total:160,cliente:args.p_cliente||"Cliente QA",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0)};
+    case "barber_admin_create_sale":
+      return {folio:"QA-RESERVED-001",total:160,cliente:"Cliente QA reserva",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0),cambio:0};
     default:
       return {};
   }
@@ -369,6 +376,25 @@ async function main() {
       if(method==="Mixto"){assert.equal(Number(latestWalkinCall.args.p_efectivo),100);assert.equal(Number(latestWalkinCall.args.p_tarjeta),60);assert.match(await pos.locator("#ticketPrint").innerText(),/EFECTIVO:\s*\$100\.00/);assert.match(await pos.locator("#ticketPrint").innerText(),/TARJETA:\s*\$60\.00/);}
       assert.equal(await pos.evaluate(() => window.__qaPrintCalled), true,
         "POS should invoke the ticket-print flow for " + method);
+    }
+
+    // Reserved-sale flow: cover the separate RPC path, including the same mixed
+    // payment payload and ticket breakdown. This path is intentionally mock-only
+    // until the real Supabase RPC signature is verified in a non-production DB.
+    if (!useLocalPostgrest) {
+      await pos.locator(".res").first().click();
+      await pos.locator("#method").selectOption("Mixto");
+      await pos.locator("#cashPart").fill("100");
+      await pos.locator("#cardPart").fill("60");
+      await pos.locator("#charge").click();
+      const reservedCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_sale").at(-1);
+      assert.ok(reservedCall, "POS should invoke the reserved-sale RPC");
+      assert.equal(reservedCall.args.p_reserva_id, "qa-reservation-mixed-001");
+      assert.equal(reservedCall.args.p_metodo, "Mixto");
+      assert.equal(Number(reservedCall.args.p_efectivo), 100);
+      assert.equal(Number(reservedCall.args.p_tarjeta), 60);
+      assert.match(await pos.locator("#ticketPrint").innerText(), /EFECTIVO:\\s*\\$100\\.00/);
+      assert.match(await pos.locator("#ticketPrint").innerText(), /TARJETA:\\s*\\$60\\.00/);
     }
 
     assert.deepEqual(productionRequests, [],
