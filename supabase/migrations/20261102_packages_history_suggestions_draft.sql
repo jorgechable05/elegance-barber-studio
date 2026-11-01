@@ -201,7 +201,7 @@ begin
   return query select c.lookback_days,c.minimum_margin_percent,c.minimum_margin_sample
     from public.barber_promotion_suggestion_settings c where c.id=1;
 end;
-$;
+$$;
 
 create or replace function public.barber_promotion_history_settings_admin_save(
   p_token uuid,p_lookback_days integer,p_minimum_margin_percent numeric,p_minimum_margin_sample integer
@@ -225,7 +225,7 @@ begin
   where id=1 returning * into v_row;
   return v_row;
 end;
-$;
+$$;
 
 create or replace function public.barber_promotions_suggestion_evidence_admin_list(p_token uuid)
 returns table(id uuid,suggestion_evidence jsonb)
@@ -239,7 +239,7 @@ begin
   end if;
   return query select p.id,p.suggestion_evidence from public.barber_promotions p where p.source='daily_suggestion';
 end;
-$;
+$$;
 
 create or replace function public.barber_service_unit_cost_admin_clear(p_token uuid,p_service_id integer)
 returns public.barber_services
@@ -257,7 +257,7 @@ begin
   if not found then raise exception 'Servicio no encontrado' using errcode='P0002'; end if;
   return v_row;
 end;
-$;
+$$;
 
 create or replace function public.barber_service_unit_cost_admin_save(
   p_token uuid,p_service_id integer,p_unit_cost numeric
