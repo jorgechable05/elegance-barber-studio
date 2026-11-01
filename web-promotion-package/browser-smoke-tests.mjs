@@ -423,7 +423,7 @@ async function main() {
       await pos.locator("#cashPart").fill("100");
       await pos.locator("#cardPart").fill("60");
       await pos.locator("#charge").click();
-      const reservedCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_sale_with_promotion_mixed").at(-1);
+      const reservedCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_sale_with_promotion_info_mixed").at(-1);
       assert.ok(reservedCall, "POS should invoke the reserved-sale RPC");
       assert.equal(reservedCall.args.p_reserva_id, "qa-reservation-mixed-001");
       assert.equal(reservedCall.args.p_metodo, "Mixto");
