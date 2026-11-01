@@ -107,3 +107,46 @@ grant execute on function public.barber_public_schedule(date,integer) to anon,au
 grant execute on function public.barber_admin_reservations(uuid) to anon,authenticated;
 grant execute on function public.barber_admin_sales(uuid) to anon,authenticated;
 grant execute on function public.barber_admin_create_walkin_sale(uuid,text,integer,integer,text,numeric,numeric,numeric) to anon,authenticated;
+
+-- CI-only legacy payment RPCs used as the underlying implementation by the
+-- additive mixed-payment overloads. These write only to the disposable fixture.
+create or replace function public.barber_admin_create_sale(
+ p_token uuid,p_reserva_id uuid,p_metodo text,p_recibido numeric
+) returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+declare r public.reservas%rowtype; s public.barber_sales%rowtype;
+begin
+ if not exists(select 1 from public.barber_admin_sessions where token=p_token and revoked_at is null and expires_at>now()) then
+  raise exception 'Sesión inválida' using errcode='28000';
+ end if;
+ select * into r from public.reservas where id=p_reserva_id for update;
+ if not found then raise exception 'Reserva no encontrada'; end if;
+ if exists(select 1 from public.barber_sales where reserva_id=p_reserva_id) then raise exception 'Reserva ya cobrada'; end if;
+ insert into public.barber_sales(reserva_id,cliente,servicio,barbero,total,metodo,recibido,cambio)
+ values(r.id,r.nombre,coalesce(r.servicio,r.serv),'EdgarMay',r.precio,p_metodo,
+        greatest(coalesce(p_recibido,r.precio),0),
+        case when p_metodo='Efectivo' then greatest(coalesce(p_recibido,r.precio)-r.precio,0) else 0 end)
+ returning * into s;
+ update public.reservas set estado='atendida' where id=r.id;
+ return jsonb_build_object('id',s.id,'folio',s.folio,'total',s.total,'cliente',s.cliente,
+   'servicio',s.servicio,'barbero',s.barbero,'metodo',s.metodo,'recibido',s.recibido,'cambio',s.cambio);
+end $$;
+
+create or replace function public.barber_admin_create_walkin_sale(
+ p_token uuid,p_cliente text,p_servicio_id integer,p_barbero_id integer,p_metodo text,p_recibido numeric
+) returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+declare s public.barber_sales%rowtype; v_service public.barber_services%rowtype; v_barber text;
+begin
+ if not exists(select 1 from public.barber_admin_sessions where token=p_token and revoked_at is null and expires_at>now()) then
+  raise exception 'Sesión inválida' using errcode='28000';
+ end if;
+ select * into v_service from public.barber_services where id=p_servicio_id and is_active;
+ if not found or p_barbero_id not in (1,2) then raise exception 'Servicio o barbero inválido'; end if;
+ v_barber:=case when p_barbero_id=1 then 'EdgarMay' else 'Staff 2' end;
+ insert into public.barber_sales(cliente,servicio,barbero,total,metodo,recibido,cambio)
+ values(coalesce(nullif(trim(p_cliente),''),'Cliente QA'),v_service.name,v_barber,v_service.price,p_metodo,
+   greatest(coalesce(p_recibido,v_service.price),0),
+   case when p_metodo='Efectivo' then greatest(coalesce(p_recibido,v_service.price)-v_service.price,0) else 0 end)
+ returning * into s;
+ return jsonb_build_object('id',s.id,'folio',s.folio,'total',s.total,'cliente',s.cliente,
+   'servicio',s.servicio,'barbero',s.barbero,'metodo',s.metodo,'recibido',s.recibido,'cambio',s.cambio);
+end $$;
