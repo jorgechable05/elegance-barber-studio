@@ -305,7 +305,7 @@ async function main() {
     if (!useLocalPostgrest) {
       // Wait for the initial async catalogue refresh before typing so it cannot
       // re-render the form and discard the user's values mid-test.
-      await admin.getByText("Corte Clásico").waitFor({state:"visible"});
+      await admin.locator(".eb-promotions-admin .eb-item").first().waitFor({state:"visible"});
       await admin.locator(".eb-promotions-admin input[type=text]").first().fill("Servicio QA nuevo");
       await admin.locator(".eb-promotions-admin textarea").first().fill("Servicio creado en mock de navegador");
       const serviceNumbers = admin.locator(".eb-promotions-admin input[type=number]");
