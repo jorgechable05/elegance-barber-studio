@@ -7,6 +7,7 @@ DECLARE
   v_today date := (now() at time zone 'America/Merida')::date;
   v_rows integer;
   v_job_exists boolean;
+  v_job_count integer;
 BEGIN
   IF has_function_privilege('anon',
        'public.barber_promotions_generate_daily_suggestions_internal()', 'EXECUTE')
@@ -30,6 +31,11 @@ BEGIN
   ) INTO v_job_exists;
   IF NOT v_job_exists THEN
     RAISE EXCEPTION 'Daily promotion job is missing or misconfigured';
+  END IF;
+  SELECT count(*) INTO v_job_count FROM cron.job
+  WHERE jobname='elegance-promotion-suggestions-daily';
+  IF v_job_count <> 1 THEN
+    RAISE EXCEPTION 'Expected exactly one daily promotion job after migration reapplication, found %',v_job_count;
   END IF;
 
   v_first := public.barber_promotions_generate_daily_suggestions_internal();
