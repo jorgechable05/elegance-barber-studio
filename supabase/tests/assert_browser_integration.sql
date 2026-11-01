@@ -5,6 +5,8 @@ DECLARE
   v_price integer;
   v_uses integer;
   v_reservations integer;
+  v_pos_sales integer;
+  v_mixed_sales integer;
 BEGIN
   SELECT uses_count INTO v_uses
   FROM public.barber_promotions
@@ -28,6 +30,22 @@ BEGIN
   RAISE NOTICE 'PASS: Playwright browser RPC persisted reservation price %, promotion uses %, rows %',
     v_price, v_uses, v_reservations;
 
+  -- The local POS Playwright path now calls the real CI-only sale contract.
+  SELECT count(*) INTO v_pos_sales FROM public.barber_sales WHERE cliente='Cliente QA local';
+  IF v_pos_sales <> 4 THEN
+    RAISE EXCEPTION 'Expected four isolated POS walk-in sales, got %',v_pos_sales;
+  END IF;
+  SELECT count(*) INTO v_mixed_sales
+    FROM public.barber_sales
+   WHERE cliente='Cliente QA local' AND metodo='Mixto'
+     AND efectivo=100 AND tarjeta=60 AND total=160
+     AND subtotal=160 AND descuento=0;
+  IF v_mixed_sales <> 1 THEN
+    RAISE EXCEPTION 'Expected one persisted mixed POS payment split with ticket breakdown, got %',v_mixed_sales;
+  END IF;
+  RAISE NOTICE 'PASS: POS test sales and mixed-payment split persisted in isolated PostgreSQL';
+
+  DELETE FROM public.barber_sales WHERE cliente='Cliente QA local';
   DELETE FROM public.reservas WHERE promotion_id = v_promo OR nombre = 'Cliente QA local';
   DELETE FROM public.barber_promotions WHERE id = v_promo;
   DELETE FROM public.barber_admin_sessions WHERE username = 'local-qa-user';
