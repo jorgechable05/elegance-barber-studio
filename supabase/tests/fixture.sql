@@ -25,3 +25,31 @@ create table public.reservas (
   estado text,
   stock_key text
 );
+
+-- CI-only pg_cron contract double. It verifies scheduler configuration without
+-- installing or running an operating-system cron worker in the disposable DB.
+create schema cron;
+create table cron.job (
+  jobid bigint generated always as identity primary key,
+  jobname text unique,
+  schedule text not null,
+  command text not null
+);
+create or replace function cron.unschedule(p_jobid bigint)
+returns boolean language plpgsql as $$
+begin
+  delete from cron.job where jobid=p_jobid;
+  return found;
+end;
+$$;
+create or replace function cron.schedule(p_jobname text, p_schedule text, p_command text)
+returns bigint language plpgsql as $$
+declare v_jobid bigint;
+begin
+  insert into cron.job(jobname,schedule,command)
+  values(p_jobname,p_schedule,p_command)
+  on conflict(jobname) do update set schedule=excluded.schedule, command=excluded.command
+  returning jobid into v_jobid;
+  return v_jobid;
+end;
+$$;
