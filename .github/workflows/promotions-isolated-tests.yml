@@ -65,8 +65,11 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_services_promotions_draft.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261031_reservation_promotion_compat.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
       - name: Reapply scheduler migration to verify idempotence
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
+      - name: Reapply mixed-payment migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
       - name: Assert legacy service compatibility and RPC contracts
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
       - name: Verify price rounding and admin-session guards
