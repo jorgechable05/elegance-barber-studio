@@ -379,35 +379,6 @@ grant execute on function public.barber_admin_create_walkin_sale_with_promotion(
 -- Return today's reservation rows with booking-time promotion details to the POS.
 -- The existing public Client reservation layout is not modified by this RPC.
 
-create or replace function public.barber_admin_reservations_with_promotions(p_token uuid)
-returns table(
-  id uuid, nombre text, telefono text, servicio text, serv text, servicio_id integer,
-  precio integer, precio_base numeric, promotion_id uuid, promotion_title text,
-  barbero text, fecha date, hora text, estado text
-)
-language plpgsql stable security definer
-set search_path = pg_catalog, public, pg_temp
-as $$
-begin
-  if not exists(
-    select 1 from public.barber_admin_sessions s
-    where s.token=p_token and s.revoked_at is null and s.expires_at>now()
-  ) then
-    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
-  end if;
-  return query
-  select r.id,r.nombre,r.telefono,r.servicio,r.serv,r.servicio_id,r.precio,
-         coalesce(r.precio_base,r.precio)::numeric,r.promotion_id,p.title,
-         r.barbero,r.fecha,r.hora,r.estado
-  from public.reservas r
-  left join public.barber_promotions p on p.id=r.promotion_id
-  where r.fecha=(now() at time zone 'America/Merida')::date
-  order by r.hora,r.barbero,r.nombre;
-end;
-$$;
-revoke all on function public.barber_admin_reservations_with_promotions(uuid) from public;
-grant execute on function public.barber_admin_reservations_with_promotions(uuid) to anon,authenticated;
-
 -- Wrappers preserve existing sale RPC behavior while persisting booking-time discount attribution.
 create or replace function public.barber_admin_create_sale_with_promotion_info(
   p_token uuid,p_reserva_id uuid,p_metodo text,p_recibido numeric
