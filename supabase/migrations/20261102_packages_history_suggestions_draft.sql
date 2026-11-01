@@ -454,7 +454,7 @@ begin
     end if;
     insert into public.barber_reservation_items(reservation_id,package_id,service_id,position,
       service_name_snapshot,base_price,booked_net_price,duration_minutes)
-    values(v_res,p_package_id,v_item.id,v_item.position,v_item.name,v_item.price,v_net,v_item.duration_minutes);
+    values(v_reservation,p_package_id,v_item.id,v_item.position,v_item.name,v_item.price,v_net,v_item.duration_minutes);
   end loop;
   if p_promotion_id is not null then
     update public.barber_promotions set uses_count=uses_count+1,updated_at=now()
