@@ -42,7 +42,7 @@ end;
 $$;
 
 create or replace function public.barber_admin_sales(p_token uuid)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
 begin
  if not exists(select 1 from public.barber_admin_sessions s where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
   raise exception 'Sesión de prueba inválida o vencida' using errcode='28000';
@@ -66,7 +66,7 @@ begin
   ) as sales
  ),'[]'::jsonb);
 end;
-$;
+$$;
 
 create or replace function public.barber_admin_create_walkin_sale(
  p_token uuid,p_cliente text,p_servicio_id integer,p_barbero_id integer,p_metodo text,p_recibido numeric,
