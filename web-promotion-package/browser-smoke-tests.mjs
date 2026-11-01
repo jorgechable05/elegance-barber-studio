@@ -63,10 +63,12 @@ function rpcFixture(name, args = {}) {
   switch (name) {
     case "barber_admin_login":
       return {token:"mock-session-for-browser-tests"};
+    case "barber_admin_reservations_with_promotions":
     case "barber_admin_reservations":
       return useLocalPostgrest ? [] : [{
         id:"qa-reservation-mixed-001", nombre:"Cliente QA reserva", telefono:"9990000000",
-        servicio:"Corte Clásico", precio:160, barbero:"EdgarMay", hora:"13:30",
+        servicio:"Corte Clásico", serv:"Corte Clásico", servicio_id:1, precio:160, precio_base:160,
+        promotion_id:null, promotion_title:null, barbero:"EdgarMay", hora:"13:30",
         estado:"confirmada", fecha:"2026-11-02"
       }];
     case "barber_admin_sales":
@@ -84,10 +86,14 @@ function rpcFixture(name, args = {}) {
       return 0;
     case "barber_create_reservation_with_promotion":
       return {id:"QA-RESERVATION-001",precio:144};
-    case "barber_admin_create_walkin_sale":
-      return {folio:"QA-WALKIN-001",total:160,cliente:args.p_cliente||"Cliente QA",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0)};
+    case "barber_admin_create_walkin_sale_with_promotion":
+      return {id:"QA-WALKIN-ID",folio:"QA-WALKIN-001",total:args.p_promotion_id?144:160,subtotal:160,descuento:args.p_promotion_id?16:0,promotion_id:args.p_promotion_id||null,promotion_title:args.p_promotion_id?"Promoción de prueba":null,cliente:args.p_cliente||"Cliente QA",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0),cambio:args.p_metodo==="Efectivo"?Number(args.p_recibido||0)-(args.p_promotion_id?144:160):0};
+    case "barber_admin_create_sale_with_promotion_info_mixed":
+      return {id:"QA-RESERVED-ID",folio:"QA-RESERVED-001",total:160,subtotal:160,descuento:0,promotion_id:null,promotion_title:null,cliente:"Cliente QA reserva",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0),cambio:0};
+    case "barber_admin_create_sale_with_promotion_info":
+      return {id:"QA-RESERVED-ID",folio:"QA-RESERVED-001",total:160,subtotal:160,descuento:0,promotion_id:null,promotion_title:null,cliente:"Cliente QA reserva",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",cambio:0};
     case "barber_admin_create_sale":
-      return {folio:"QA-RESERVED-001",total:160,cliente:"Cliente QA reserva",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0),cambio:0};
+      return {id:"QA-RESERVED-ID",folio:"QA-RESERVED-001",total:160,cliente:"Cliente QA reserva",servicio:"Corte Clásico",barbero:"EdgarMay",metodo:args.p_metodo||"Efectivo",efectivo:Number(args.p_efectivo||0),tarjeta:Number(args.p_tarjeta||0),cambio:0};
     default:
       return {};
   }
@@ -400,7 +406,7 @@ async function main() {
       await pos.evaluate(() => { window.__qaPrintCalled = false; });
       await pos.locator("#walkCharge").click();
       await pos.locator("#walkinModal").waitFor({state:"hidden"});
-      const latestWalkinCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_walkin_sale").at(-1);
+      const latestWalkinCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_walkin_sale_with_promotion").at(-1);
       assert.ok(latestWalkinCall, "POS should invoke the walk-in sale RPC for " + method);
       assert.equal(latestWalkinCall.args.p_metodo, method, "POS should preserve selected payment method");
       if(method==="Mixto"){assert.equal(Number(latestWalkinCall.args.p_efectivo),100);assert.equal(Number(latestWalkinCall.args.p_tarjeta),60);assert.match(await pos.locator("#ticketPrint").innerText(),/EFECTIVO:\s*\$100\.00/);assert.match(await pos.locator("#ticketPrint").innerText(),/TARJETA:\s*\$60\.00/);}
@@ -417,7 +423,7 @@ async function main() {
       await pos.locator("#cashPart").fill("100");
       await pos.locator("#cardPart").fill("60");
       await pos.locator("#charge").click();
-      const reservedCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_sale").at(-1);
+      const reservedCall = observedRpcCalls.filter(call => call.name === "barber_admin_create_sale_with_promotion_mixed").at(-1);
       assert.ok(reservedCall, "POS should invoke the reserved-sale RPC");
       assert.equal(reservedCall.args.p_reserva_id, "qa-reservation-mixed-001");
       assert.equal(reservedCall.args.p_metodo, "Mixto");
