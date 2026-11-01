@@ -393,8 +393,8 @@ async function main() {
       assert.equal(reservedCall.args.p_metodo, "Mixto");
       assert.equal(Number(reservedCall.args.p_efectivo), 100);
       assert.equal(Number(reservedCall.args.p_tarjeta), 60);
-      assert.match(await pos.locator("#ticketPrint").innerText(), /EFECTIVO:\\s*\\$100\\.00/);
-      assert.match(await pos.locator("#ticketPrint").innerText(), /TARJETA:\\s*\\$60\\.00/);
+      assert.match(await pos.locator("#ticketPrint").innerText(), /EFECTIVO:\s*\$100\.00/);
+      assert.match(await pos.locator("#ticketPrint").innerText(), /TARJETA:\s*\$60\.00/);
     }
 
     assert.deepEqual(productionRequests, [],
