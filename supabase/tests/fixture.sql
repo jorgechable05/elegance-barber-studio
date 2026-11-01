@@ -26,6 +26,21 @@ create table public.reservas (
   stock_key text
 );
 
+-- Minimal sales table for payment-split migration contract tests.
+create table public.barber_sales (
+  id bigint generated always as identity primary key,
+  folio text not null unique default ('CI-' || gen_random_uuid()::text),
+  reserva_id uuid,
+  cliente text not null,
+  servicio text not null,
+  barbero text not null,
+  total numeric(12,2) not null,
+  metodo text not null,
+  recibido numeric(12,2) not null default 0,
+  cambio numeric(12,2) not null default 0,
+  creado timestamptz not null default now()
+);
+
 -- CI-only pg_cron contract double. It verifies scheduler configuration without
 -- installing or running an operating-system cron worker in the disposable DB.
 create schema cron;
