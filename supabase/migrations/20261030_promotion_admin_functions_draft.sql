@@ -59,8 +59,18 @@ begin
      or (p_max_uses is not null and p_max_uses <= 0) then
     raise exception 'Datos de promoción inválidos' using errcode='22023';
   end if;
+  if (p_start_time is null) <> (p_end_time is null) then
+    raise exception 'Indica la hora inicial y final, o deja ambos campos vacíos' using errcode='22023';
+  end if;
   if p_start_time is not null and p_end_time is not null and p_end_time <= p_start_time then
     raise exception 'El horario final debe ser posterior al inicial' using errcode='22023';
+  end if;
+  if p_discount_type = 'fixed_price' and exists (
+    select 1 from unnest(p_service_ids) sid
+    join public.barber_services s on s.id=sid
+    where p_discount_value > s.price
+  ) then
+    raise exception 'El precio especial no puede superar el precio normal de ninguno de los servicios seleccionados' using errcode='22023';
   end if;
   if exists (
     select 1 from unnest(coalesce(p_weekdays,'{}'::smallint[])) d where d < 0 or d > 6
