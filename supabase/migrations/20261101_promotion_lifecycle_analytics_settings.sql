@@ -57,7 +57,7 @@ begin
      or p_discount_percent<=0 or p_discount_percent>90
      or p_max_suggestions_per_day not between 1 and 10
      or p_opportunity_window_hours not between 1 and 168 then
-    raise exception 'Configuración diaria inválida. Descuento 0-90%, sugerencias 1-10 y ventana 1-168 horas.' using errcode='22023';
+    raise exception 'Configuración diaria inválida. Descuento entre 0 y 90 por ciento, sugerencias 1-10 y ventana 1-168 horas.' using errcode='22023';
   end if;
   update public.barber_promotion_suggestion_settings
      set enabled=p_enabled, discount_percent=p_discount_percent,
