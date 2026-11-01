@@ -301,6 +301,20 @@ async function main() {
         "; pageErrors=" + JSON.stringify(browserErrors));
     }
     await admin.locator("#promotionsToggle").click();
+    await admin.getByRole("button", {name:"Crear servicio"}).waitFor({state:"visible"});
+    await admin.locator(".eb-promotions-admin input[type=text]").first().fill("Servicio QA nuevo");
+    await admin.locator(".eb-promotions-admin textarea").first().fill("Servicio creado en mock de navegador");
+    const serviceNumbers = admin.locator(".eb-promotions-admin input[type=number]");
+    await serviceNumbers.nth(0).fill("35");
+    await serviceNumbers.nth(1).fill("190");
+    await serviceNumbers.nth(2).fill("10");
+    await admin.locator(".eb-promotions-admin input[type=checkbox]").first().check();
+    await admin.getByRole("button", {name:"Crear servicio"}).click();
+    await waitForRpcCall("barber_service_admin_save");
+    const createServiceCall = [...observedRpcCalls,...calls].filter(call => call.name === "barber_service_admin_save").at(-1);
+    assert.equal(createServiceCall.args.p_id, null);
+    assert.equal(createServiceCall.args.p_name, "Servicio QA nuevo");
+    assert.equal(Number(createServiceCall.args.p_price), 190);
     await admin.getByRole("button", {name:"Promociones y sugerencias"}).click();
     await admin.getByText("Crear promoción").waitFor({state:"visible"});
     await waitForRpcCall("barber_promotions_admin_list");
