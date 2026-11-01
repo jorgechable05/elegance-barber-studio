@@ -66,10 +66,13 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261031_reservation_promotion_compat.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
       - name: Reapply scheduler migration to verify idempotence
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
       - name: Reapply mixed-payment migration to verify idempotence
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
+      - name: Reapply promotion lifecycle migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
       - name: Assert legacy service compatibility and RPC contracts
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
       - name: Verify price rounding and admin-session guards
@@ -78,6 +81,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_mixed_payment.sql
       - name: Validate isolated scheduler permissions and idempotence
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_scheduler_contract.sql
+      - name: Validate promotion lifecycle, metrics and configurable suggestions
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_promotion_lifecycle.sql
       - name: Start local PostgREST API for RPC integration
         env:
           PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
