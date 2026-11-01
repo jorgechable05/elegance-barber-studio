@@ -461,9 +461,9 @@ begin
       where id=p_promotion_id and status='approved' and (max_uses is null or uses_count<max_uses);
     if not found then raise exception 'La promoción alcanzó su límite de usos' using errcode='22023'; end if;
   end if;
-  return v_res;
+  return v_reservation;
 end;
-$$;
+$;
 
 -- Single atomic walk-in package checkout; payment split is computed against package price,
 -- and service-level sale items preserve the actual allocation and cost snapshot.
