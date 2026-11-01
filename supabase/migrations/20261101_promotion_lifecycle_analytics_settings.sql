@@ -22,7 +22,7 @@ create or replace function public.barber_promotion_suggestion_settings_admin_get
 returns table(enabled boolean, discount_percent numeric, max_suggestions_per_day integer,
               opportunity_window_hours integer, updated_at timestamptz)
 language plpgsql stable security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 begin
   if not exists (
@@ -43,7 +43,7 @@ create or replace function public.barber_promotion_suggestion_settings_admin_sav
 )
 returns public.barber_promotion_suggestion_settings
 language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare v_row public.barber_promotion_suggestion_settings;
 begin
@@ -72,7 +72,7 @@ $$;
 create or replace function public.barber_promotion_admin_duplicate(p_token uuid, p_id uuid)
 returns public.barber_promotions
 language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare v_source public.barber_promotions; v_copy public.barber_promotions;
 begin
@@ -102,7 +102,7 @@ $$;
 create or replace function public.barber_promotion_admin_delete(p_token uuid, p_id uuid)
 returns boolean
 language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare v_promo public.barber_promotions;
 begin
@@ -122,6 +122,57 @@ begin
 end;
 $$;
 
+-- Validate promotion state transitions on the server, including the final approval decision.
+create or replace function public.barber_promotion_admin_review(p_token uuid, p_id uuid, p_decision text)
+returns public.barber_promotions
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+declare v_row public.barber_promotions;
+begin
+  if not exists (
+    select 1 from public.barber_admin_sessions s
+    where s.token=p_token and s.revoked_at is null and s.expires_at>now()
+  ) then
+    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
+  end if;
+  if p_decision not in ('approved','rejected','paused','pending_review','draft') then
+    raise exception 'Decisión no válida' using errcode='22023';
+  end if;
+  select * into v_row from public.barber_promotions where id=p_id for update;
+  if not found then raise exception 'Promoción no encontrada' using errcode='P0002'; end if;
+
+  if p_decision='approved' then
+    if v_row.ends_at<=now() then
+      raise exception 'No se puede aprobar una promoción vencida' using errcode='22023';
+    end if;
+    if v_row.starts_at is null or v_row.ends_at<=v_row.starts_at then
+      raise exception 'La vigencia de la promoción no es válida' using errcode='22023';
+    end if;
+    if not exists(select 1 from public.barber_promotion_services ps where ps.promotion_id=p_id) then
+      raise exception 'Selecciona al menos un servicio antes de aprobar' using errcode='22023';
+    end if;
+    if v_row.discount_type='percent' and (v_row.discount_value<=0 or v_row.discount_value>100) then
+      raise exception 'El porcentaje de descuento no es válido' using errcode='22023';
+    end if;
+    if v_row.discount_type='fixed_price' and exists (
+      select 1 from public.barber_promotion_services ps
+      join public.barber_services s on s.id=ps.service_id
+      where ps.promotion_id=p_id and v_row.discount_value>s.price
+    ) then
+      raise exception 'El precio especial supera el precio normal de un servicio incluido' using errcode='22023';
+    end if;
+  end if;
+
+  update public.barber_promotions
+     set status=p_decision,
+         approved_at=case when p_decision='approved' then now() else null end,
+         updated_at=now()
+   where id=p_id returning * into v_row;
+  return v_row;
+end;
+$;
+
 -- Truthful metrics from reservation records only. This schema cannot yet attribute completed sales
 -- or calculate discount savings because sales do not carry promotion_id/base price.
 create or replace function public.barber_promotions_admin_metrics(p_token uuid)
@@ -130,7 +181,7 @@ returns table(
   reservation_count bigint, booked_revenue numeric
 )
 language plpgsql stable security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 begin
   if not exists (
@@ -155,7 +206,7 @@ $$;
 create or replace function public.barber_promotions_generate_daily_suggestions(p_token uuid)
 returns integer
 language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_cfg public.barber_promotion_suggestion_settings;
@@ -213,7 +264,7 @@ $$;
 create or replace function public.barber_promotions_generate_daily_suggestions_internal()
 returns integer
 language plpgsql security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_cfg public.barber_promotion_suggestion_settings;
