@@ -186,6 +186,79 @@ begin
 end;
 $$;
 
+
+-- Dedicated settings API avoids changing the existing RPC result/signature contract.
+create or replace function public.barber_promotion_history_settings_admin_get(p_token uuid)
+returns table(lookback_days integer,minimum_margin_percent numeric,minimum_margin_sample integer)
+language plpgsql stable security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+begin
+  if not exists(select 1 from public.barber_admin_sessions s
+    where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
+    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
+  end if;
+  return query select c.lookback_days,c.minimum_margin_percent,c.minimum_margin_sample
+    from public.barber_promotion_suggestion_settings c where c.id=1;
+end;
+$;
+
+create or replace function public.barber_promotion_history_settings_admin_save(
+  p_token uuid,p_lookback_days integer,p_minimum_margin_percent numeric,p_minimum_margin_sample integer
+)
+returns public.barber_promotion_suggestion_settings
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+declare v_row public.barber_promotion_suggestion_settings;
+begin
+  if not exists(select 1 from public.barber_admin_sessions s
+    where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
+    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
+  end if;
+  if p_lookback_days not between 7 and 180 or p_minimum_margin_percent not between 0 and 95
+     or p_minimum_margin_sample not between 1 and 100 then
+    raise exception 'Reglas de demanda y margen inválidas' using errcode='22023';
+  end if;
+  update public.barber_promotion_suggestion_settings set lookback_days=p_lookback_days,
+    minimum_margin_percent=p_minimum_margin_percent,minimum_margin_sample=p_minimum_margin_sample,updated_at=now()
+  where id=1 returning * into v_row;
+  return v_row;
+end;
+$;
+
+create or replace function public.barber_promotions_suggestion_evidence_admin_list(p_token uuid)
+returns table(id uuid,suggestion_evidence jsonb)
+language plpgsql stable security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+begin
+  if not exists(select 1 from public.barber_admin_sessions s
+    where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
+    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
+  end if;
+  return query select p.id,p.suggestion_evidence from public.barber_promotions p where p.source='daily_suggestion';
+end;
+$;
+
+create or replace function public.barber_service_unit_cost_admin_clear(p_token uuid,p_service_id integer)
+returns public.barber_services
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+declare v_row public.barber_services;
+begin
+  if not exists(select 1 from public.barber_admin_sessions s
+    where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
+    raise exception 'Sesión de administrador inválida o vencida' using errcode='28000';
+  end if;
+  update public.barber_services set unit_cost=null,updated_at=now()
+    where id=p_service_id returning * into v_row;
+  if not found then raise exception 'Servicio no encontrado' using errcode='P0002'; end if;
+  return v_row;
+end;
+$;
+
 create or replace function public.barber_service_unit_cost_admin_save(
   p_token uuid,p_service_id integer,p_unit_cost numeric
 )
@@ -265,11 +338,12 @@ declare v_start timestamp; v_end timestamp;
 begin
   if new.fecha is null or nullif(trim(new.hora),'') is null then return new; end if;
   if new.duracion_minutos is null then
-    select coalesce(s.duration_minutes,30) into new.duracion_minutos
-      from (select 1) x
-      left join public.barber_services s on
-        (new.servicio_id is not null and s.id=new.servicio_id)
-        or (new.servicio_id is null and s.name in (new.servicio,new.serv));
+    select s.duration_minutes into new.duracion_minutos
+      from public.barber_services s
+      where (new.servicio_id is not null and s.id=new.servicio_id)
+        or (new.servicio_id is null and s.name=coalesce(nullif(trim(new.servicio),''),new.serv))
+      order by case when new.servicio_id is not null then 0 else 1 end
+      limit 1;
     new.duracion_minutos:=coalesce(new.duracion_minutos,30);
   end if;
   if new.duracion_minutos not between 5 and 960 then
@@ -283,7 +357,7 @@ begin
     select 1 from public.reservas r
     left join public.barber_services s on
       (r.servicio_id is not null and s.id=r.servicio_id)
-      or (r.servicio_id is null and s.name in (r.servicio,r.serv))
+      or (r.servicio_id is null and s.name=coalesce(nullif(trim(r.servicio),''),r.serv))
     where r.barbero=new.barbero and r.fecha=new.fecha
       and (new.id is null or r.id<>new.id)
       and lower(coalesce(r.estado,'pendiente')) not in ('rechazada','cancelada','atendida')
@@ -547,16 +621,15 @@ begin
       where s.creado>=now()-make_interval(days=>v_cfg.lookback_days)
     ), agg as (
       select l.service_id,count(distinct l.sale_id) sales_count,
-        avg(100*(l.net_amount-l.cost_snapshot)/nullif(l.net_amount,0))
-          filter(where l.cost_snapshot is not null and l.net_amount>0) margin_pct,
+        coalesce(sum(l.net_amount),0)::numeric revenue,
+        (avg(100*(l.net_amount-l.cost_snapshot)/nullif(l.net_amount,0))
+          filter(where l.cost_snapshot is not null and l.net_amount>0))::numeric margin_pct,
         count(*) filter(where l.cost_snapshot is not null) margin_samples
       from sale_lines l group by l.service_id
     )
     select s.id,s.name,coalesce(a.sales_count,0) sales_count,a.margin_pct,
       coalesce(a.margin_samples,0) margin_samples,
-      coalesce((select sum(s2.total) from public.barber_sales s2
-        where s2.servicio=s.name and s2.package_id is null
-          and s2.creado>=now()-make_interval(days=>v_cfg.lookback_days)),0)::numeric revenue
+      coalesce(a.revenue,0)::numeric revenue
     from public.barber_services s left join agg a on a.service_id=s.id
     where s.is_active and not exists(
       select 1 from public.barber_promotion_services ps join public.barber_promotions p on p.id=ps.promotion_id
@@ -611,6 +684,10 @@ revoke all on function public.barber_service_package_admin_list(uuid) from publi
 revoke all on function public.barber_service_package_public() from public;
 revoke all on function public.barber_service_package_admin_save(uuid,uuid,text,text,numeric,boolean,integer[]) from public;
 revoke all on function public.barber_service_unit_cost_admin_save(uuid,integer,numeric) from public;
+revoke all on function public.barber_service_unit_cost_admin_clear(uuid,integer) from public;
+revoke all on function public.barber_promotion_history_settings_admin_get(uuid) from public;
+revoke all on function public.barber_promotion_history_settings_admin_save(uuid,integer,numeric,integer) from public;
+revoke all on function public.barber_promotions_suggestion_evidence_admin_list(uuid) from public;
 revoke all on function public.barber_service_sales_history_admin_list(uuid,integer) from public;
 revoke all on function public.barber_create_package_reservation(integer,date,text,text,text,uuid,uuid) from public;
 revoke all on function public.barber_admin_create_package_sale(uuid,text,uuid,integer,text,numeric,numeric,numeric) from public;
@@ -619,6 +696,10 @@ grant execute on function public.barber_service_package_admin_list(uuid) to anon
 grant execute on function public.barber_service_package_public() to anon,authenticated;
 grant execute on function public.barber_service_package_admin_save(uuid,uuid,text,text,numeric,boolean,integer[]) to anon,authenticated;
 grant execute on function public.barber_service_unit_cost_admin_save(uuid,integer,numeric) to anon,authenticated;
+grant execute on function public.barber_service_unit_cost_admin_clear(uuid,integer) to anon,authenticated;
+grant execute on function public.barber_promotion_history_settings_admin_get(uuid) to anon,authenticated;
+grant execute on function public.barber_promotion_history_settings_admin_save(uuid,integer,numeric,integer) to anon,authenticated;
+grant execute on function public.barber_promotions_suggestion_evidence_admin_list(uuid) to anon,authenticated;
 grant execute on function public.barber_service_sales_history_admin_list(uuid,integer) to anon,authenticated;
 grant execute on function public.barber_create_package_reservation(integer,date,text,text,text,uuid,uuid) to anon,authenticated;
 grant execute on function public.barber_admin_create_package_sale(uuid,text,uuid,integer,text,numeric,numeric,numeric) to anon,authenticated;
