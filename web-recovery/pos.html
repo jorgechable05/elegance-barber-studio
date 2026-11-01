@@ -90,7 +90,6 @@ function updateWalkinKind(){
  $('wservice').style.display=isPackage?'none':'';
  $('wpromotion').style.display=isPackage?'none':'';
  $('wpackage').style.display=isPackage?'':'none';
- $('wpromoSummary').textContent=isPackage?'Selecciona un paquete para ver el precio conjunto.':'Selecciona un servicio para ver promociones.';
  renderWalkinPromotionSummary();
 }
 function selectedWalkinPricing(){
@@ -106,384 +105,11 @@ function selectedWalkinPricing(){
 function renderWalkinPromotionSummary(){
  const pricing=selectedWalkinPricing();
  if(pricing.package){
-  $('wpromoSummary').textContent=pricing.package.name+': '+pricing.package.service_names.join(' + ')+' · Por separado 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const kind=$('wkind').value,service=$('wservice').selectedOptions[0],sid=Number($('wservice').value);
- const packageId=$('wpackage').value,barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(kind==='package'&&!pricing.package)return alert('Selecciona un paquete activo.');
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  let sale;
-  if(kind==='package'){
-   sale=await rpc('barber_admin_create_package_sale',{
-    p_token:token,p_cliente:nombre,p_package_id:packageId,p_barbero_id:barberId,p_metodo:method,
-    p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null
-   });
-   sale.servicio=sale.paquete||pricing.package.name;
-  }else{
-   sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-    p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-    p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-    p_promotion_id:pricing.promo?pricing.promo.id:null
-   });
-  }
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;
-$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-$('wpackage').addEventListener('change',renderWalkinPromotionSummary);$('wkind').addEventListener('change',updateWalkinKind);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.subtotal.toFixed(2)+' · Descuento de paquete -
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.discount.toFixed(2)+' · Total 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.total.toFixed(2);
+  $('wpromoSummary').textContent=pricing.package.name+': '+pricing.package.service_names.join(' + ')+' · Por separado $'+pricing.subtotal.toFixed(2)+' · Ahorro de paquete -$'+pricing.discount.toFixed(2)+' · Total $'+pricing.total.toFixed(2);
  }else{
   $('wpromoSummary').textContent=pricing.promo?
-   pricing.promo.title+': Subtotal 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.subtotal.toFixed(2)+' · Descuento -
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.discount.toFixed(2)+' · Total 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.total.toFixed(2):
-   'Subtotal 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.subtotal.toFixed(2)+' · Sin descuento · Total 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+pricing.total.toFixed(2);
+   pricing.promo.title+': Subtotal $'+pricing.subtotal.toFixed(2)+' · Descuento -$'+pricing.discount.toFixed(2)+' · Total $'+pricing.total.toFixed(2):
+   'Subtotal $'+pricing.subtotal.toFixed(2)+' · Sin descuento · Total $'+pricing.total.toFixed(2);
  }
 }
 async function loadWalkinPackages(){
@@ -494,52 +120,7 @@ async function loadWalkinPackages(){
   select.replaceChildren();
   for(const p of walkinPackages){
    const option=document.createElement('option');option.value=String(p.id);
-   option.textContent=p.name+' — '+p.service_names.join(' + ')+' — 
-async function loadWalkinPromotions(){
- const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
- select.replaceChildren();
- const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
- walkinPromotions=[];
- try{
-  const rows=await rpc('barber_promotions_public',{});
-  for(const p of (Array.isArray(rows)?rows:[])){
-   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
-   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
-   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
-   if(p.start_time||p.end_time){
-    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
-    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
-   }
-   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
-   if(pricing.discount<=0)continue;
-   walkinPromotions.push(p);
-   const option=document.createElement('option');option.value=p.id;
-   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
-  }
- }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
- renderWalkinPromotionSummary();
-}
-async function walkinCharge(){
- const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
- if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
- try{
-  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
-  $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
-  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
- }catch(e){alert(e.message)}
-}
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
-function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
-</body></html>
-+Number(p.price).toFixed(2);
+   option.textContent=p.name+' — '+p.service_names.join(' + ')+' — $'+Number(p.price).toFixed(2);
    select.append(option);
   }
   if(walkinPackages.some(p=>String(p.id)===previous))select.value=previous;
@@ -573,21 +154,32 @@ async function loadWalkinPromotions(){
 }
 async function walkinCharge(){
  const nombre=$('wname').value.trim()||'Cliente mostrador';
- const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
- const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
+ const kind=$('wkind').value,sid=Number($('wservice').value),packageId=$('wpackage').value;
+ const barberId=Number($('wbarber').value),method=$('wmethod').value,pricing=selectedWalkinPricing();
+ const received=Number($('wreceived').value||pricing.total);
+ if(kind==='package'&&!pricing.package)return alert('Selecciona un paquete activo.');
  if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
  try{
   const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
-  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
-   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
-   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
-   p_promotion_id:pricing.promo?pricing.promo.id:null
-  });
+  let sale;
+  if(kind==='package'){
+   sale=await rpc('barber_admin_create_package_sale',{p_token:token,p_cliente:nombre,p_package_id:packageId,
+    p_barbero_id:barberId,p_metodo:method,p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,
+    p_tarjeta:isMixed?mixed.p_tarjeta:null});
+   sale.servicio=sale.paquete||pricing.package.name;
+  }else{
+   sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{p_token:token,p_cliente:nombre,
+    p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,p_recibido:received,
+    p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
+    p_promotion_id:pricing.promo?pricing.promo.id:null});
+  }
   $('walkinModal').style.display='none';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
   printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
  }catch(e){alert(e.message)}
 }
-$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
+$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;
+$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
+$('wpackage').addEventListener('change',renderWalkinPromotionSummary);$('wkind').addEventListener('change',updateWalkinKind);
 function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
 </script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
 </body></html>
