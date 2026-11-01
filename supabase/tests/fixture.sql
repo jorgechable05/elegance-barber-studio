@@ -68,3 +68,26 @@ begin
   return v_jobid;
 end;
 $$;
+
+-- Minimal editable catalogue schema referenced by the legacy walk-in RPC fixture.
+create table public.barber_services (
+  id integer primary key,
+  name text not null,
+  description text not null default '',
+  duration_minutes integer not null default 30,
+  price numeric(10,2) not null check (price >= 0),
+  is_active boolean not null default true,
+  display_order integer not null default 100,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+insert into public.barber_services (id,name,price,is_active) values
+ (1,'Corte Clásico',160,true),
+ (2,'Corte Desvanecido',180,true),
+ (3,'Corte Infantil',130,true),
+ (4,'Alineación de Ceja',40,true),
+ (5,'Alineación de Barba',80,true),
+ (6,'Corte + Masaje',280,true),
+ (7,'Corte y Lavado de Cabello',250,true),
+ (8,'VIP',400,true),
+ (9,'Premium',550,true);
