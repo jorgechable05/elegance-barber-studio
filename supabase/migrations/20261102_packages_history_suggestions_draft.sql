@@ -192,7 +192,7 @@ create or replace function public.barber_promotion_history_settings_admin_get(p_
 returns table(lookback_days integer,minimum_margin_percent numeric,minimum_margin_sample integer)
 language plpgsql stable security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 begin
   if not exists(select 1 from public.barber_admin_sessions s
     where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
@@ -209,7 +209,7 @@ create or replace function public.barber_promotion_history_settings_admin_save(
 returns public.barber_promotion_suggestion_settings
 language plpgsql security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 declare v_row public.barber_promotion_suggestion_settings;
 begin
   if not exists(select 1 from public.barber_admin_sessions s
@@ -231,7 +231,7 @@ create or replace function public.barber_promotions_suggestion_evidence_admin_li
 returns table(id uuid,suggestion_evidence jsonb)
 language plpgsql stable security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 begin
   if not exists(select 1 from public.barber_admin_sessions s
     where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
@@ -245,7 +245,7 @@ create or replace function public.barber_service_unit_cost_admin_clear(p_token u
 returns public.barber_services
 language plpgsql security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 declare v_row public.barber_services;
 begin
   if not exists(select 1 from public.barber_admin_sessions s
