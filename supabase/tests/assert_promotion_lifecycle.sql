@@ -113,5 +113,5 @@ BEGIN
   IF NOT v_blocked THEN
     RAISE EXCEPTION 'Expired promotion was approved';
   END IF;
-END $;
+END $$;
 ROLLBACK;
