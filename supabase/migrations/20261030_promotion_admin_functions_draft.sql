@@ -233,17 +233,22 @@ revoke all on function public.barber_promotions_generate_daily_suggestions_inter
 grant execute on function public.barber_promotions_generate_daily_suggestions_internal() to service_role;
 
 -- Schedule at 12:00 UTC (~06:00 in Yucatán) only when pg_cron is already available.
+-- Remove an existing job with this name first so reapplying the migration is idempotent.
 do $schedule$
+declare v_job_id bigint;
 begin
   if exists (select 1 from pg_extension where extname='pg_cron') then
-    execute $cmd$select cron.schedule(
+    for v_job_id in
+      select jobid from cron.job where jobname='elegance-promotion-suggestions-daily'
+    loop
+      perform cron.unschedule(v_job_id);
+    end loop;
+    perform cron.schedule(
       'elegance-promotion-suggestions-daily',
       '0 12 * * *',
       'select public.barber_promotions_generate_daily_suggestions_internal();'
-    )$cmd$;
+    );
   end if;
-exception when others then
-  raise notice 'Daily promotion scheduler not configured automatically: %', sqlerrm;
 end
 $schedule$;
 
