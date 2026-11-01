@@ -6,6 +6,7 @@ DECLARE
   v_pending uuid := '11111111-1111-4111-8111-111111111112';
   v_expired_token uuid := '22222222-2222-4222-8222-222222222221';
   v_revoked_token uuid := '22222222-2222-4222-8222-222222222222';
+  v_admin_token uuid := '22222222-2222-4222-8222-222222222223';
   v_date date;
   v_reservation uuid;
   v_price integer;
@@ -76,9 +77,35 @@ BEGIN
   IF NOT v_blocked THEN RAISE EXCEPTION 'Pending suggestion was accepted at booking'; END IF;
 
   INSERT INTO public.barber_admin_sessions(token,username,expires_at,revoked_at)
+    VALUES (v_admin_token,'ci-admin',now()+interval '1 day',NULL);
+  INSERT INTO public.barber_admin_sessions(token,username,expires_at,revoked_at)
     VALUES (v_expired_token,'ci-expired',now()-interval '1 minute',NULL);
   INSERT INTO public.barber_admin_sessions(token,username,expires_at,revoked_at)
     VALUES (v_revoked_token,'ci-revoked',now()+interval '1 day',now());
+
+  v_blocked := false;
+  BEGIN
+    PERFORM public.barber_promotion_admin_save(
+      v_admin_token,NULL,'CI invalid fixed price','','fixed_price',200,
+      now(),now()+interval '1 day',ARRAY[0,1,2,3,4,5,6]::smallint[],
+      NULL,NULL,ARRAY[1]::integer[],NULL
+    );
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN RAISE EXCEPTION 'Fixed price above service price was accepted'; END IF;
+
+  v_blocked := false;
+  BEGIN
+    PERFORM public.barber_promotion_admin_save(
+      v_admin_token,NULL,'CI incomplete time range','','percent',10,
+      now(),now()+interval '1 day',ARRAY[0,1,2,3,4,5,6]::smallint[],
+      '13:00'::time,NULL,ARRAY[1]::integer[],NULL
+    );
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN RAISE EXCEPTION 'Promotion with incomplete time range was accepted'; END IF;
 
   v_blocked := false;
   BEGIN
