@@ -39,3 +39,15 @@
 - [x] No se aplicaron migraciones a Supabase, no se creó rama/proyecto de pago y no se cambió Vercel.
 
 **Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** El preview valida solo la interfaz y contratos simulados. Mantener PR #1 en borrador; no fusionar ni desplegar hasta probar el backend real y el scheduler en una instancia no productiva.
+
+## Mejoras de gestión incorporadas en la rama (pendiente de CI)
+- [x] Añadida migración borrador `20261101_promotion_lifecycle_analytics_settings.sql` para duplicar promociones como borradores y eliminar solo promociones sin usos ni reservas asociadas.
+- [x] Añadida métrica veraz de promociones basada en reservas persistidas: reservas vinculadas e importe reservado. No se presenta como ventas cobradas ni calcula ahorro/ROI porque el esquema de ventas aún no vincula promociones ni registra precio base histórico.
+- [x] Añadidos controles de UI Admin para duplicar y eliminar (con confirmación y validación de backend).
+- [x] Añadida configuración de generación de sugerencias: habilitar/deshabilitar, porcentaje sugerido, máximo diario y ventana de oportunidad.
+- [x] Generador manual y programado consumen la configuración y mantienen cada sugerencia en `pending_review`; generación diaria protegida con advisory lock e idempotencia por fecha de Pisté/Mérida.
+- [x] Flujo CI ampliado para aplicar/reaplicar la migración y probar acciones, métricas, reglas configurables y generación en la base temporal.
+- [ ] Verificar los nuevos cambios mediante el resultado final de GitHub Actions antes de marcar esta parte aprobada.
+- [ ] La generación diaria es heurística configurable, no una predicción de demanda ni de margen: actualmente no hay suficientes datos fiables de coste/margen ni atribución de ventas.
+- [ ] Promociones por paquete siguen pendientes: el modelo de reserva actual representa un solo servicio por reserva y el POS actual cobra un único servicio o una reserva; no debe presentarse un paquete multid servicio como funcional sin ampliar carrito/contrato de reservas con regresión.
+- [ ] Se mantiene pendiente la certificación en Supabase no productivo y la comprobación del scheduler real. La CI usa PostgreSQL temporal y `pg_cron` de test solamente.
