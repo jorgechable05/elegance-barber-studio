@@ -18,11 +18,14 @@ function pick(id){
    (discount>0?'<div class="muted" style="margin-top:6px">Subtotal $'+subtotal.toFixed(2)+' · Descuento -$'+discount.toFixed(2)+(selected.promotion_title?' · '+selected.promotion_title:'')+'</div>':'');
  $('total').textContent='$'+total.toFixed(2);$('change').textContent='';render()
 }
+function escapeTicketText(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function printTicket(info){
  const total=Number(info.total??info.precio??0);
  const subtotal=Number(info.subtotal??info.precio_base??total);
  const discount=Number(info.descuento??Math.max(subtotal-total,0));
- const promotion=info.promotion_title?'<div><b>PROMOCIÓN:</b> '+info.promotion_title+'</div>':'';
+ const promotion=info.promotion_title?'<div><b>PROMOCIÓN:</b> '+escapeTicketText(info.promotion_title)+'</div>':'';
+ const packageItems=Array.isArray(info.service_names)&&info.service_names.length?
+   '<div><b>INCLUYE:</b><br>'+info.service_names.map(escapeTicketText).join('<br>')+'</div>':'';
  const breakdown='<div><b>SUBTOTAL:</b> $'+subtotal.toFixed(2)+'</div>'+
    (discount>0?promotion+'<div><b>DESCUENTO:</b> -$'+discount.toFixed(2)+'</div>':'');
  const split=String(info.metodo||'')==='Mixto'?'<div><b>EFECTIVO:</b> $'+Number(info.efectivo||0).toFixed(2)+'</div><div><b>TARJETA:</b> $'+Number(info.tarjeta||0).toFixed(2)+'</div>':'';
@@ -166,7 +169,7 @@ async function walkinCharge(){
    sale=await rpc('barber_admin_create_package_sale',{p_token:token,p_cliente:nombre,p_package_id:packageId,
     p_barbero_id:barberId,p_metodo:method,p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,
     p_tarjeta:isMixed?mixed.p_tarjeta:null});
-   sale.servicio=sale.paquete||pricing.package.name;
+   sale.servicio=sale.paquete||pricing.package.name;sale.service_names=pricing.package.service_names;
   }else{
    sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{p_token:token,p_cliente:nombre,
     p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,p_recibido:received,
