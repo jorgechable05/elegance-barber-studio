@@ -89,7 +89,8 @@ export function mountPromotionsAdmin({
     form.append(formField("Nombre",name), formField("Descripción",desc), formField("Duración (minutos)",duration), formField("Precio normal",price), formField("Orden",order), activeWrap);
     const save = el("button", {type:"submit"}, "Crear servicio");
     const status = el("p", {className:"eb-muted"});
-    content.append(el("h3", {}, "Catálogo de servicios"), form, save, status);
+    form.append(save);
+    content.append(el("h3", {}, "Catálogo de servicios"), form, status);
     form.onsubmit = async event => {
       event.preventDefault();
       try {
@@ -163,7 +164,8 @@ export function mountPromotionsAdmin({
     cancelEdit.hidden = !editingPromotionId;
     const suggest = el("button",{type:"button"},"Generar sugerencias para revisión");
     const message = el("p",{className:"eb-muted"});
-    content.append(el("h3",{},editingPromotionId ? "Editar promoción" : "Crear promoción"),form,save,cancelEdit,suggest,message);
+    form.append(save);
+    content.append(el("h3",{},editingPromotionId ? "Editar promoción" : "Crear promoción"),form,cancelEdit,suggest,message);
     cancelEdit.onclick = () => { editingPromotionId = null; renderPromotions(); };
     form.onsubmit = async event => {
       event.preventDefault();
