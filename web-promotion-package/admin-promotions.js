@@ -55,6 +55,8 @@ export function mountPromotionsAdmin({
 
   let services = [];
   let promotions = [];
+  let metrics = [];
+  let suggestionSettings = {enabled:true, discount_percent:10, max_suggestions_per_day:3, opportunity_window_hours:24};
   let view = "services";
   let editingPromotionId = null;
 
@@ -72,6 +74,13 @@ export function mountPromotionsAdmin({
       ]);
       services = Array.isArray(serviceRows) ? serviceRows : [];
       promotions = Array.isArray(promotionRows) ? promotionRows : [];
+      const [metricRows, settingsRows] = await Promise.all([
+        rpc("barber_promotions_admin_metrics", {p_token:token}).catch(() => null),
+        rpc("barber_promotion_suggestion_settings_admin_get", {p_token:token}).catch(() => null),
+      ]);
+      metrics = Array.isArray(metricRows) ? metricRows : [];
+      if (Array.isArray(settingsRows) && settingsRows[0]) suggestionSettings = settingsRows[0];
+      else if (settingsRows && !Array.isArray(settingsRows)) suggestionSettings = settingsRows;
       render();
     } catch (error) { onError(error); }
   }
@@ -165,7 +174,40 @@ export function mountPromotionsAdmin({
     const suggest = el("button",{type:"button"},"Generar sugerencias para revisión");
     const message = el("p",{className:"eb-muted"});
     form.append(save);
-    content.append(el("h3",{},editingPromotionId ? "Editar promoción" : "Crear promoción"),form,cancelEdit,suggest,message);
+    content.append(el("h3",{},editingPromotionId ? "Editar promoción" : "Crear promoción"));
+
+    const settingsForm = el("form",{className:"eb-grid"});
+    const suggestionsEnabled = el("input",{type:"checkbox"});
+    suggestionsEnabled.checked = suggestionSettings.enabled !== false;
+    const suggestionPercent = el("input",{type:"number",min:"1",max:"90",step:"0.5",value:String(suggestionSettings.discount_percent ?? 10)});
+    const suggestionLimit = el("input",{type:"number",min:"1",max:"10",step:"1",value:String(suggestionSettings.max_suggestions_per_day ?? 3)});
+    const suggestionWindow = el("input",{type:"number",min:"1",max:"168",step:"1",value:String(suggestionSettings.opportunity_window_hours ?? 24)});
+    const saveSettings = el("button",{type:"submit"},"Guardar reglas diarias");
+    const settingsStatus = el("p",{className:"eb-muted"},"La sugerencia automática usa reglas configurables; aún no analiza demanda ni márgenes históricos.");
+    settingsForm.append(
+      formField("Generar sugerencias diariamente",suggestionsEnabled),
+      formField("Descuento sugerido (%)",suggestionPercent),
+      formField("Máximo de sugerencias por día",suggestionLimit),
+      formField("Ventana de oportunidad (horas)",suggestionWindow),
+      saveSettings
+    );
+    settingsForm.onsubmit = async event => {
+      event.preventDefault();
+      try {
+        const saved = await rpc("barber_promotion_suggestion_settings_admin_save",{
+          p_token:token,p_enabled:suggestionsEnabled.checked,
+          p_discount_percent:Number(suggestionPercent.value),
+          p_max_suggestions_per_day:Number(suggestionLimit.value),
+          p_opportunity_window_hours:Number(suggestionWindow.value)
+        });
+        suggestionSettings = saved || {enabled:suggestionsEnabled.checked,discount_percent:Number(suggestionPercent.value),max_suggestions_per_day:Number(suggestionLimit.value),opportunity_window_hours:Number(suggestionWindow.value)};
+        settingsStatus.textContent = "Reglas diarias guardadas.";
+      } catch(error) { settingsStatus.textContent = error.message; onError(error); }
+    };
+    content.append(el("h3",{},"Reglas de sugerencias diarias"),settingsForm,settingsStatus,
+      el("p",{className:"eb-muted"},"Métricas de promociones · reservas asociadas e importe reservado; no representa ventas cobradas."));
+    form.append(save);
+    content.append(form,cancelEdit,suggest,message);
     cancelEdit.onclick = () => { editingPromotionId = null; renderPromotions(); };
     form.onsubmit = async event => {
       event.preventDefault();
@@ -225,6 +267,23 @@ export function mountPromotionsAdmin({
         form.scrollIntoView({behavior:"smooth",block:"start"});
       };
       row.append(edit);
+      const duplicate=el("button",{},"Duplicar");
+      duplicate.onclick=async()=>{
+        try {
+          await rpc("barber_promotion_admin_duplicate",{p_token:token,p_id:promo.id});
+          await refresh();
+        } catch(error) { onError(error); }
+      };
+      row.append(duplicate);
+      const remove=el("button",{},"Eliminar");
+      remove.onclick=async()=>{
+        if (!window.confirm("¿Eliminar esta promoción? Solo se pueden borrar ofertas sin uso ni reservas asociadas.")) return;
+        try {
+          await rpc("barber_promotion_admin_delete",{p_token:token,p_id:promo.id});
+          await refresh();
+        } catch(error) { onError(error); }
+      };
+      row.append(remove);
       if (promo.status==="pending_review" || promo.status==="draft") {
         const approve=el("button",{},"Aprobar");
         approve.onclick=()=>review(promo.id,"approved");
