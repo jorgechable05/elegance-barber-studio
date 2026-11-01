@@ -1,0 +1,82 @@
+name: Package and history integration checks
+on:
+  push:
+    branches: [feat/paquetes-analitica-certificacion]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - 'web-recovery/**'
+      - '.github/workflows/packages-history-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - 'web-recovery/**'
+      - '.github/workflows/packages-history-tests.yml'
+permissions:
+  contents: read
+jobs:
+  packages-history-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: elegance_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d elegance_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: elegance_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run existing browser and JavaScript checks
+        working-directory: web-promotion-package
+        run: |
+          npm test
+          npm install --no-save --no-package-lock playwright@1.64.1
+          npx playwright install --with-deps chromium
+          node browser-smoke-tests.mjs
+      - name: Load CI-only legacy schema
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/legacy_ui_rpc_fixture.sql
+      - name: Apply and reapply additive migrations in disposable PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_services_promotions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261031_reservation_promotion_compat.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_promotion_application_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261102_packages_history_suggestions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_promotion_application_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261102_packages_history_suggestions_draft.sql
+      - name: Run package, overlap, payment, demand and margin assertions
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_packages_history_suggestions.sql
+      - name: Check all existing regression contracts
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_behavior.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_mixed_payment.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_scheduler_contract.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_promotion_lifecycle.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_pos_promotions.sql
+          bash supabase/tests/assert_concurrent_uses.sh

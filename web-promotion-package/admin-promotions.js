@@ -46,7 +46,9 @@ export function mountPromotionsAdmin({
   const tabs = el("div", {role:"group", "aria-label":"Secciones"});
   const servicesTab = el("button", {}, "Servicios");
   const promotionsTab = el("button", {}, "Promociones y sugerencias");
-  tabs.append(servicesTab, promotionsTab);
+  const packagesTab = el("button", {}, "Paquetes");
+  const historyTab = el("button", {}, "Demanda y margen");
+  tabs.append(servicesTab, promotionsTab, packagesTab, historyTab);
   host.append(tabs);
 
   const content = el("div");
@@ -55,10 +57,13 @@ export function mountPromotionsAdmin({
 
   let services = [];
   let promotions = [];
+  let packages = [];
+  let historyMetrics = [];
   let metrics = [];
   let suggestionSettings = {enabled:true, discount_percent:10, max_suggestions_per_day:3, opportunity_window_hours:24};
   let view = "services";
   let editingPromotionId = null;
+  let editingPackageId = null;
 
   const formField = (label, input) => {
     const wrapper = el("label");
@@ -68,19 +73,30 @@ export function mountPromotionsAdmin({
 
   async function refresh() {
     try {
-      const [serviceRows, promotionRows] = await Promise.all([
+      const [serviceRows, promotionRows, packageRows] = await Promise.all([
         rpc("barber_services_admin_list", {p_token:token}),
         rpc("barber_promotions_admin_list", {p_token:token}),
+        rpc("barber_service_package_admin_list", {p_token:token}),
       ]);
       services = Array.isArray(serviceRows) ? serviceRows : [];
       promotions = Array.isArray(promotionRows) ? promotionRows : [];
-      const [metricRows, settingsRows] = await Promise.all([
+      packages = Array.isArray(packageRows) ? packageRows : [];
+      const [metricRows, settingsRows, historyRows, evidenceRows, historySettingsRows] = await Promise.all([
         rpc("barber_promotions_admin_metrics", {p_token:token}).catch(() => null),
         rpc("barber_promotion_suggestion_settings_admin_get", {p_token:token}).catch(() => null),
+        rpc("barber_service_sales_history_admin_list", {p_token:token,p_lookback_days:30}).catch(() => null),
+        rpc("barber_promotions_suggestion_evidence_admin_list", {p_token:token}).catch(() => null),
+        rpc("barber_promotion_history_settings_admin_get", {p_token:token}).catch(() => null),
       ]);
       metrics = Array.isArray(metricRows) ? metricRows : [];
+      historyMetrics = Array.isArray(historyRows) ? historyRows : [];
       if (Array.isArray(settingsRows) && settingsRows[0]) suggestionSettings = settingsRows[0];
       else if (settingsRows && !Array.isArray(settingsRows)) suggestionSettings = settingsRows;
+      const historySettings = Array.isArray(historySettingsRows) ? historySettingsRows[0] : historySettingsRows;
+      if (historySettings) suggestionSettings = {...suggestionSettings,...historySettings};
+      const evidenceById = new Map((Array.isArray(evidenceRows) ? evidenceRows : [])
+        .map(item => [String(item.id),item.suggestion_evidence]));
+      promotions.forEach(item => { item.suggestion_evidence = evidenceById.get(String(item.id)) || null; });
       render();
     } catch (error) { onError(error); }
   }
@@ -92,10 +108,11 @@ export function mountPromotionsAdmin({
     const desc = el("textarea");
     const duration = el("input", {type:"number", min:"5", step:"5", value:"30"});
     const price = el("input", {type:"number", min:"0", step:"0.01", value:"0"});
+    const unitCost = el("input", {type:"number", min:"0", step:"0.01", placeholder:"Déjalo vacío si el costo es desconocido"});
     const order = el("input", {type:"number", min:"0", step:"1", value:"100"});
     const active = el("input", {type:"checkbox"});
     const activeWrap = formField("Servicio activo", active);
-    form.append(formField("Nombre",name), formField("Descripción",desc), formField("Duración (minutos)",duration), formField("Precio normal",price), formField("Orden",order), activeWrap);
+    form.append(formField("Nombre",name), formField("Descripción",desc), formField("Duración (minutos)",duration), formField("Precio normal",price), formField("Costo unitario real (opcional)",unitCost), formField("Orden",order), activeWrap);
     const save = el("button", {type:"submit"}, "Crear servicio");
     const status = el("p", {className:"eb-muted"});
     form.append(save);
@@ -103,11 +120,14 @@ export function mountPromotionsAdmin({
     form.onsubmit = async event => {
       event.preventDefault();
       try {
-        await rpc("barber_service_admin_save", {
+        const savedService = await rpc("barber_service_admin_save", {
           p_token:token, p_id:null, p_name:name.value.trim(), p_description:desc.value.trim(),
           p_duration_minutes:Number(duration.value), p_price:Number(price.value),
           p_is_active:active.checked, p_display_order:Number(order.value)
         });
+        if (unitCost.value.trim() !== "") {
+          await rpc("barber_service_unit_cost_admin_save", {p_token:token,p_service_id:savedService.id,p_unit_cost:Number(unitCost.value)});
+        }
         status.textContent = "Servicio guardado.";
         await refresh();
       } catch(error) { status.textContent = error.message; onError(error); }
@@ -120,7 +140,7 @@ export function mountPromotionsAdmin({
       edit.onclick = () => {
         name.value = service.name || ""; desc.value = service.description || "";
         duration.value = service.duration_minutes; price.value = service.price;
-        order.value = service.display_order; active.checked = !!service.is_active;
+        order.value = service.display_order; active.checked = !!service.is_active; unitCost.value = service.unit_cost ?? "";
         const originalSubmit = form.onsubmit;
         form.onsubmit = async event => {
           event.preventDefault();
@@ -130,12 +150,70 @@ export function mountPromotionsAdmin({
               p_duration_minutes:Number(duration.value), p_price:Number(price.value),
               p_is_active:active.checked, p_display_order:Number(order.value)
             });
+            if (unitCost.value.trim() !== "") {
+              await rpc("barber_service_unit_cost_admin_save", {p_token:token,p_service_id:service.id,p_unit_cost:Number(unitCost.value)});
+            } else if (service.unit_cost != null) {
+              await rpc("barber_service_unit_cost_admin_clear", {p_token:token,p_service_id:service.id});
+            }
             form.onsubmit = originalSubmit; await refresh();
           } catch(error) { status.textContent=error.message; onError(error); }
         };
         save.textContent = "Guardar cambios";
       };
       row.append(edit); content.append(row);
+    }
+  }
+
+
+  function renderPackages() {
+    content.replaceChildren();
+    const form=el("form",{className:"eb-grid"});
+    const name=el("input",{type:"text",required:true});
+    const description=el("textarea");
+    const price=el("input",{type:"number",min:"0",step:"0.01",required:true,value:"0"});
+    const active=el("input",{type:"checkbox"});active.checked=true;
+    const serviceSelect=el("select");serviceSelect.multiple=true;
+    for(const service of services.filter(s=>s.is_active)) serviceSelect.append(el("option",{value:String(service.id)},service.name+" — $"+Number(service.price).toFixed(2)));
+    const status=el("p",{className:"eb-muted"},"Un paquete requiere dos o más servicios activos y un precio no mayor que su suma. La validación final ocurre en el servidor.");
+    const save=el("button",{type:"submit"},editingPackageId?"Guardar paquete":"Crear paquete");
+    const cancel=el("button",{type:"button"},"Cancelar edición");cancel.hidden=!editingPackageId;
+    form.append(formField("Nombre del paquete",name),formField("Descripción",description),formField("Precio conjunto",price),formField("Servicios incluidos (mínimo 2)",serviceSelect),formField("Paquete activo",active),save,cancel);
+    content.append(el("h3",{},editingPackageId?"Editar paquete":"Paquetes de varios servicios"),form,status);
+    cancel.onclick=()=>{editingPackageId=null;renderPackages();};
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      try {
+        const ids=Array.from(serviceSelect.selectedOptions).map(o=>Number(o.value));
+        if(ids.length<2) throw new Error("Selecciona al menos dos servicios.");
+        await rpc("barber_service_package_admin_save",{p_token:token,p_id:editingPackageId,p_name:name.value.trim(),
+          p_description:description.value.trim(),p_price:Number(price.value),p_is_active:active.checked,p_service_ids:ids});
+        editingPackageId=null;await refresh();
+      } catch(error){status.textContent=error.message;onError(error);}
+    };
+    for(const pack of packages){
+      const row=el("div",{className:"eb-item"});
+      row.append(el("strong",{},pack.name),el("p",{},(pack.service_names||[]).join(" + ")),
+        el("p",{},`Precio paquete ${Number(pack.price).toFixed(2)} · Precio por separado ${Number(pack.base_total).toFixed(2)} · Ahorro ${(Number(pack.base_total)-Number(pack.price)).toFixed(2)} · Duración ${Number(pack.duration_minutes)} min · ${pack.is_active?"Activo":"Inactivo"}`));
+      const edit=el("button",{},"Editar");
+      edit.onclick=()=>{editingPackageId=pack.id;name.value=pack.name;description.value=pack.description||"";price.value=pack.price;active.checked=!!pack.is_active;
+        const selected=new Set((pack.service_ids||[]).map(String));Array.from(serviceSelect.options).forEach(o=>o.selected=selected.has(o.value));
+        save.textContent="Guardar paquete";cancel.hidden=false;form.scrollIntoView({behavior:"smooth",block:"start"});};
+      row.append(edit);content.append(row);
+    }
+  }
+
+  function renderHistory() {
+    content.replaceChildren();
+    content.append(el("h3",{},"Ventas y margen estimado por servicio"));
+    content.append(el("p",{className:"eb-muted"},"Periodo: últimos 30 días. El ingreso se atribuye desde ventas y artículos de paquete. El margen solo se calcula cuando existe costo unitario capturado en el momento de la venta; las ventas antiguas sin ese dato no se rellenan retrospectivamente."));
+    for(const item of historyMetrics){
+      const row=el("div",{className:"eb-item"});
+      const margin=item.margin_percent==null?"No disponible":Number(item.margin_percent).toFixed(1)+"%";
+      const coverage=Number(item.margin_coverage_percent||0).toFixed(0)+"%";
+      row.append(el("strong",{},item.service_name),
+        el("p",{},`Ventas: ${Number(item.sales_count||0)} · Ingreso atribuido: ${Number(item.revenue||0).toFixed(2)}`),
+        el("p",{},`Margen estimado: ${item.estimated_margin==null?"no disponible":"$"+Number(item.estimated_margin).toFixed(2)} · % margen: ${margin} · Cobertura de costos: ${coverage} · Muestra de costos: ${Number(item.margin_sample_count||0)}`));
+      content.append(row);
     }
   }
 
@@ -182,13 +260,19 @@ export function mountPromotionsAdmin({
     const suggestionPercent = el("input",{type:"number",min:"1",max:"90",step:"0.5",value:String(suggestionSettings.discount_percent ?? 10)});
     const suggestionLimit = el("input",{type:"number",min:"1",max:"10",step:"1",value:String(suggestionSettings.max_suggestions_per_day ?? 3)});
     const suggestionWindow = el("input",{type:"number",min:"1",max:"168",step:"1",value:String(suggestionSettings.opportunity_window_hours ?? 24)});
+    const lookbackDays = el("input",{type:"number",min:"7",max:"180",step:"1",value:String(suggestionSettings.lookback_days ?? 30)});
+    const minMarginPercent = el("input",{type:"number",min:"0",max:"95",step:"1",value:String(suggestionSettings.minimum_margin_percent ?? 20)});
+    const minMarginSample = el("input",{type:"number",min:"1",max:"100",step:"1",value:String(suggestionSettings.minimum_margin_sample ?? 3)});
     const saveSettings = el("button",{type:"submit"},"Guardar reglas diarias");
-    const settingsStatus = el("p",{className:"eb-muted"},"La sugerencia automática usa reglas configurables; aún no analiza demanda ni márgenes históricos.");
+    const settingsStatus = el("p",{className:"eb-muted"},"Las sugerencias priorizan ventas del periodo y margen estimado con costos capturados al cobrar. Ventas antiguas sin costo guardado no se usan para inventar márgenes; con datos insuficientes, la sugerencia queda identificada como heurística.");
     settingsForm.append(
       formField("Generar sugerencias diariamente",suggestionsEnabled),
       formField("Descuento sugerido (%)",suggestionPercent),
       formField("Máximo de sugerencias por día",suggestionLimit),
       formField("Ventana de oportunidad (horas)",suggestionWindow),
+      formField("Historial de ventas analizado (días)",lookbackDays),
+      formField("Margen mínimo deseado (%)",minMarginPercent),
+      formField("Ventas con costo requeridas para evaluar margen",minMarginSample),
       saveSettings
     );
     settingsForm.onsubmit = async event => {
@@ -200,8 +284,15 @@ export function mountPromotionsAdmin({
           p_max_suggestions_per_day:Number(suggestionLimit.value),
           p_opportunity_window_hours:Number(suggestionWindow.value)
         });
-        suggestionSettings = saved || {enabled:suggestionsEnabled.checked,discount_percent:Number(suggestionPercent.value),max_suggestions_per_day:Number(suggestionLimit.value),opportunity_window_hours:Number(suggestionWindow.value)};
-        settingsStatus.textContent = "Reglas diarias guardadas.";
+        const historySaved = await rpc("barber_promotion_history_settings_admin_save",{
+          p_token:token,p_lookback_days:Number(lookbackDays.value),
+          p_minimum_margin_percent:Number(minMarginPercent.value),
+          p_minimum_margin_sample:Number(minMarginSample.value)
+        });
+        suggestionSettings = {...(saved || {}),...(historySaved || {}),enabled:suggestionsEnabled.checked,
+          discount_percent:Number(suggestionPercent.value),max_suggestions_per_day:Number(suggestionLimit.value),
+          opportunity_window_hours:Number(suggestionWindow.value)};
+        settingsStatus.textContent = "Reglas guardadas. El generador prioriza demanda observada y margen solo si existe una muestra de costos suficiente; el resto queda marcado como heurístico.";
       } catch(error) { settingsStatus.textContent = error.message; onError(error); }
     };
     content.append(el("h3",{},"Reglas de sugerencias diarias"),settingsForm,settingsStatus,
@@ -242,7 +333,7 @@ export function mountPromotionsAdmin({
       row.append(el("p",{className:"eb-muted"},`${new Date(promo.starts_at).toLocaleString()} — ${new Date(promo.ends_at).toLocaleString()}`));
       const metric = metrics.find(item => String(item.id) === String(promo.id));
       if (metric) {
-        row.append(el("p",{className:"eb-muted"},`Reservas: ${Number(metric.reservation_count||0)} · Importe reservado: ${Number(metric.booked_revenue||0).toFixed(2)} · Contador de usos: ${Number(metric.usage_counter||0)}`));
+        row.append(el("p",{className:"eb-muted"},`Reservas: ${Number(metric.reservation_count||0)} · Importe reservado: ${Number(metric.booked_revenue||0).toFixed(2)} · Contador de usos: ${Number(metric.usage_counter||0)} · ${promo.suggestion_evidence?.basis || "sin evidencia de sugerencia"}`));
       }
       const edit=el("button",{},"Editar");
       edit.onclick=()=>{
@@ -313,10 +404,14 @@ export function mountPromotionsAdmin({
 
   function render() {
     if (view==="services") renderServices();
-    else renderPromotions();
+    else if (view==="promotions") renderPromotions();
+    else if (view==="packages") renderPackages();
+    else renderHistory();
   }
   servicesTab.onclick=()=>{view="services";render();};
   promotionsTab.onclick=()=>{view="promotions";render();};
+  packagesTab.onclick=()=>{view="packages";render();};
+  historyTab.onclick=()=>{view="history";render();};
   renderServices();
   refresh();
   return { refresh, destroy:()=>host.remove() };
