@@ -1,4 +1,12 @@
-# Estado de implementación (actualizado 2026-10-31)
+# Estado de implementación (actualizado 2026-11-01)
+
+## Cambios recientes verificados en la rama aislada
+- [x] Corregido el guardado del catálogo: los botones de guardar ahora pertenecen a sus formularios y disparan el envío.
+- [x] Promociones existentes se pueden editar; al guardar cambios vuelven a borrador y requieren aprobación explícita para volver a publicarse.
+- [x] El editor de servicios mantiene el catálogo existente y permite crear, editar y activar/desactivar servicios sin borrar IDs históricos.
+- [x] La validación de servidor rechaza precios especiales superiores al precio normal de cualquiera de los servicios seleccionados y exige ambos extremos del horario o ninguno.
+- [x] El alta/actualización de la programación diaria es idempotente; la prueba comprueba el trabajo de `pg_cron` si la extensión está instalada.
+- [x] Playwright ejercita creación de servicio y edición de promoción en el mock de navegador; la suite completa pasó en el commit `f3211cfa20ae640779eebf522f43f6045177e9f8`: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41315884875
 
 ## Avances comprobados en rama aislada
 - [x] Recuperadas las fuentes de `/admin`, `/cliente` y `/pos` bajo `web-recovery/`; no se modificó el despliegue.
