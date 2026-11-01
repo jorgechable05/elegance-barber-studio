@@ -1,0 +1,64 @@
+# Estado de implementación (actualizado 2026-11-01)
+
+## Cambios recientes verificados en la rama aislada
+- [x] Corregido el guardado del catálogo: los botones de guardar ahora pertenecen a sus formularios y disparan el envío.
+- [x] Promociones existentes se pueden editar; al guardar cambios vuelven a borrador y requieren aprobación explícita para volver a publicarse.
+- [x] El editor de servicios mantiene el catálogo existente y permite crear, editar y activar/desactivar servicios sin borrar IDs históricos.
+- [x] La validación de servidor rechaza precios especiales superiores al precio normal de cualquiera de los servicios seleccionados y exige ambos extremos del horario o ninguno.
+- [x] El alta/actualización de la programación diaria es idempotente; la prueba comprueba el trabajo de `pg_cron` si la extensión está instalada.
+- [x] Playwright ejercita creación de servicio y edición de promoción en el mock de navegador; la suite completa pasó en el commit `f3211cfa20ae640779eebf522f43f6045177e9f8`: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41315884875
+
+## Avances comprobados en rama aislada
+- [x] Recuperadas las fuentes de `/admin`, `/cliente` y `/pos` bajo `web-recovery/`; no se modificó el despliegue.
+- [x] Añadido al Admin recuperado un acceso separado a Servicios y Promociones, sin alterar la agenda existente por defecto.
+- [x] El cliente recuperado consulta servicios activos y ofertas aprobadas, y envía la selección a la RPC de reserva del servidor sin confiar en un precio enviado por el navegador.
+- [x] Conservados los IDs numéricos de servicio 1–9 y el importe histórico entero de `reservas.precio`.
+- [x] La función interna de sugerencias diarias queda restringida a `service_role`; el SQL intenta programar `pg_cron` solo si la extensión ya está disponible.
+- [x] POS recuperado: se agregaron campos separados para efectivo y tarjeta cuando se elige `Mixto`, validación para que ambos sumen exactamente el total, y desglose visible en el ticket térmico de 58 mm.
+- [x] La fixture CI exclusiva de PostgreSQL temporal ahora persiste ventas y pagos sintéticos, permite volver a leer las ventas y rechaza el desglose mixto incorrecto. La fixture está prohibida para bases alojadas.
+- [x] GitHub Actions ahora activa las pruebas cuando cambian las páginas recuperadas del POS.
+- [x] PR #1 sigue abierto como borrador, no fusionado: https://github.com/jorgechable05/elegance-barber-studio/pull/1
+
+## Última ejecución automatizada
+- [x] JavaScript unitario y análisis sintáctico de las vistas.
+- [x] Playwright con backend simulado, sin peticiones al Supabase de producción.
+- [x] Migraciones y contratos sobre PostgreSQL temporal.
+- [x] Integración HTTP de RPC con PostgREST local.
+- [x] Flujo de navegador contra PostgREST local y verificación/limpieza de la reserva creada.
+- [x] Contratos del scheduler, permisos e idempotencia en PostgreSQL temporal.
+- [x] Prueba concurrente de promoción de uso único.
+- [x] Resultado de la ejecución aislada con persistencia de venta de prueba, pagos mixtos, sintaxis de POS y demás suites: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41242628784
+- [x] POS recuperado en rama aislada ya no incorpora el endpoint ni la clave en el código fuente; exige configuración explícita y rechaza de forma preventiva el host `elegance-piste`. Se verificó con Playwright y cero peticiones al backend activo.
+
+## Bloqueos para certificar producción
+- [ ] **Contrato real del POS:** el backend real no está versionado en este repositorio y no se confirmó que `barber_admin_create_sale` ni `barber_admin_create_walkin_sale` acepten `p_efectivo` y `p_tarjeta`. La prueba actual demuestra persistencia y lectura solo en el fixture de CI; no equivale a una venta persistida en Supabase. No desplegar el cambio de pagos mixtos hasta alinear y probar la RPC real en un entorno no productivo.
+- [ ] **Supabase no productivo:** no se identificó un proyecto de pruebas separado de Elegance. No usar `elegance-piste`, no aplicar migraciones ni ejecutar ventas reales hasta identificar/autorizar el entorno aislado.
+- [ ] **Scheduler en Supabase:** CI prueba la función e idempotencia en PostgreSQL temporal, pero no demuestra que `pg_cron` esté instalado/activo ni que exista el trabajo diario en una instancia de Supabase.
+- [x] **Vista previa de interfaz:** se desplegó y probó un preview Vercel que solo usa un mock local incluido en el despliegue. URL: https://elegance-barber-piste-g8njzuafo-dell-723c.vercel.app. No hay persistencia y WhatsApp está desactivado.
+- [ ] **Integración real de backend:** este preview no sustituye a una instancia Supabase no productiva. No iniciar pruebas de persistencia real mientras no se identifique/autorice ese backend.
+- [x] No se aplicaron migraciones a Supabase, no se creó rama/proyecto de pago y no se cambió Vercel.
+
+**Estado de certificación: NO CERTIFICADO PARA PRODUCCIÓN.** El preview valida solo la interfaz y contratos simulados. Mantener PR #1 en borrador; no fusionar ni desplegar hasta probar el backend real y el scheduler en una instancia no productiva.
+
+## Mejoras de gestión incorporadas en la rama (pendiente de CI)
+- [x] Añadida migración borrador `20261101_promotion_lifecycle_analytics_settings.sql` para duplicar promociones como borradores y eliminar solo promociones sin usos ni reservas asociadas.
+- [x] Añadida métrica veraz de promociones basada en reservas persistidas: reservas vinculadas e importe reservado. No se presenta como ventas cobradas ni calcula ahorro/ROI porque el esquema de ventas aún no vincula promociones ni registra precio base histórico.
+- [x] Añadidos controles de UI Admin para duplicar y eliminar (con confirmación y validación de backend).
+- [x] Añadida configuración de generación de sugerencias: habilitar/deshabilitar, porcentaje sugerido, máximo diario y ventana de oportunidad.
+- [x] Generador manual y programado consumen la configuración y mantienen cada sugerencia en `pending_review`; generación diaria protegida con advisory lock e idempotencia por fecha de Pisté/Mérida.
+- [x] Flujo CI ampliado para aplicar/reaplicar la migración y probar acciones, métricas, reglas configurables y generación en la base temporal.
+- [ ] Verificar los nuevos cambios mediante el resultado final de GitHub Actions antes de marcar esta parte aprobada.
+- [ ] La generación diaria es heurística configurable, no una predicción de demanda ni de margen: actualmente no hay suficientes datos fiables de coste/margen ni atribución de ventas.
+- [ ] Promociones por paquete siguen pendientes: el modelo de reserva actual representa un solo servicio por reserva y el POS actual cobra un único servicio o una reserva; no debe presentarse un paquete multid servicio como funcional sin ampliar carrito/contrato de reservas con regresión.
+- [ ] Se mantiene pendiente la certificación en Supabase no productivo y la comprobación del scheduler real. La CI usa PostgreSQL temporal y `pg_cron` de test solamente.
+
+## Estado posterior a la ampliación de POS (2026-11-01)
+- [x] El POS aislado consulta el catálogo administrable de servicios y ofrece promociones aprobadas aplicables a venta sin reserva; el servidor vuelve a comprobar servicio, estado, vigencia, días, horario y límite de usos antes de cobrar.
+- [x] El ticket de POS incorpora subtotal, nombre de promoción cuando corresponda, descuento y total. Las ventas con reserva conservan el precio base y el identificador de promoción fijados al reservar, sin recalcular reservas históricas.
+- [x] Las RPC nuevas para POS registran atribución de promoción y descuento; la validación del pago mixto usa el total descontado y exige que efectivo + tarjeta sume exactamente el total.
+- [x] CI añade pruebas SQL para venta de mostrador con promoción, cambio en efectivo, división de pago mixto, rechazo y rollback ante división inválida, y persistencia de la promoción aplicada a una reserva.
+- [x] Última ejecución aislada completa aprobada en commit `55a48acf8cc07847594794cead7227e62788ea40`: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41338584122 (33/33 pasos en verde, PostgreSQL temporal + PostgREST local + Playwright).
+- [ ] **Paquetes mult-servicio no certificados ni implementados como compra única.** El modelo actual de reserva y POS sigue representando un solo servicio por turno; mostrar un paquete requiere un carrito/contrato multi-servicio y pruebas de disponibilidad, cancelación, precio e inventario antes de ofrecerlo al público.
+- [ ] **Backend real y scheduler remoto siguen sin certificar.** Todas las pruebas anteriores usan PostgreSQL temporal/PostgREST local y fixtures sintéticas; todavía se necesita un proyecto Supabase no productivo autorizado para confirmar persistencia real y `pg_cron`. No usar `elegance-piste` para esas pruebas.
+- [ ] La sugerencia diaria es configurable e idempotente, pero usa reglas heurísticas y no predice demanda ni margen porque aún no hay una fuente fiable de costes, márgenes o demanda en el esquema actual.
+- [ ] La PR sigue en borrador, sin merge ni despliegue. No se aplicaron migraciones a ningún proyecto Supabase alojado.

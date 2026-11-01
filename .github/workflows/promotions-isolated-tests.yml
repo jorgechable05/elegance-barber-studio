@@ -1,0 +1,140 @@
+name: Isolated promotions checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - 'web-recovery/**'
+      - '.github/workflows/promotions-isolated-tests.yml'
+  push:
+    branches: [feat/servicios-promociones-web]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'web-promotion-package/**'
+      - 'web-recovery/**'
+      - '.github/workflows/promotions-isolated-tests.yml'
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: elegance_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d elegance_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: elegance_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run isolated JavaScript tests
+        working-directory: web-promotion-package
+        run: npm test
+      - name: Install pinned Playwright for isolated browser tests
+        working-directory: web-promotion-package
+        run: npm install --no-save --no-package-lock playwright@1.64.1
+      - name: Install Chromium for browser tests
+        working-directory: web-promotion-package
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests with mocked backend only
+        working-directory: web-promotion-package
+        run: node browser-smoke-tests.mjs
+      - name: Create minimal existing-schema fixture
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/fixture.sql
+      - name: Install CI-only legacy UI RPC fixtures
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/legacy_ui_rpc_fixture.sql
+      - name: Apply additive promotion migrations to temporary PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_services_promotions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261031_reservation_promotion_compat.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_promotion_application_draft.sql
+      - name: Reapply scheduler migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030_promotion_admin_functions_draft.sql
+      - name: Reapply mixed-payment migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_mixed_payment_contract_draft.sql
+      - name: Reapply promotion lifecycle migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_promotion_lifecycle_analytics_settings.sql
+      - name: Reapply POS promotion migration to verify idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101_pos_promotion_application_draft.sql
+      - name: Assert legacy service compatibility and RPC contracts
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
+      - name: Verify price rounding and admin-session guards
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_behavior.sql
+      - name: Verify mixed-payment splits, duplicate protection and rollback
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_mixed_payment.sql
+      - name: Validate isolated scheduler permissions and idempotence
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_scheduler_contract.sql
+      - name: Validate promotion lifecycle, metrics and configurable suggestions
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_promotion_lifecycle.sql
+      - name: Validate POS promotion discounts, ticket metadata and payment splits
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_pos_promotions.sql
+      - name: Start local PostgREST API for RPC integration
+        env:
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: |
+          docker run --detach --name postgrest-rpc-test --network host \
+            -e PGRST_DB_URI=postgres://postgres:postgres@127.0.0.1:5432/elegance_test \
+            -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET="$PGRST_JWT_SECRET" \
+            -e PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v16.5
+          ready=0
+          for attempt in $(seq 1 30); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ || true)"
+            if [ "$code" != "000" ] && [ -n "$code" ]; then
+              ready=1
+              echo "PostgREST HTTP listener ready (root HTTP status $code)"
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then docker logs postgrest-rpc-test; exit 1; fi
+      - name: Exercise promotion RPCs through local PostgREST HTTP
+        working-directory: web-promotion-package
+        env:
+          PGRST_URL: http://127.0.0.1:3000
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: node rpc-http-integration-tests.mjs
+      - name: Assert and clean local HTTP RPC records
+        if: success()
+        run: |
+          if docker inspect postgrest-rpc-test >/dev/null 2>&1; then
+            psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_http_integration.sql
+          fi
+      - name: Seed approved promotion for isolated browser-to-RPC test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/seed_browser_promotion.sql
+      - name: Run Playwright against local PostgREST RPC
+        working-directory: web-promotion-package
+        env:
+          PGRST_URL: http://127.0.0.1:3000
+          PGRST_JWT_SECRET: local-ci-only-jwt-secret-do-not-reuse-2026-10
+        run: node browser-smoke-tests.mjs
+      - name: Assert and clean browser-created reservation
+        if: success()
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_browser_integration.sql
+      - name: Stop local PostgREST API
+        if: always()
+        run: docker rm --force postgrest-rpc-test || true
+      - name: Verify single-use promotion under concurrent reservations
+        run: bash supabase/tests/assert_concurrent_uses.sh

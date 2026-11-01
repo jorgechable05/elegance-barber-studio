@@ -1,0 +1,65 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elegance Barber - Admin</title><style>*{box-sizing:border-box}body{margin:0;background:#080808;color:#f5f5f5;font-family:Arial,sans-serif}.login{min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 50% 15%,#302817,#080808 42%)}.card{width:min(400px,100%);background:#151515;border:1px solid #333;border-radius:18px;padding:26px}.logo{text-align:center;color:#d4af37;font:700 28px Georgia}.sub{text-align:center;color:#777;font-size:11px;letter-spacing:2px;margin:8px 0 22px}.input{width:100%;padding:13px;margin:6px 0;background:#090909;color:#fff;border:1px solid #333;border-radius:9px}.btn{padding:11px 14px;border:0;border-radius:9px;font-weight:700;cursor:pointer}.gold{background:#d4af37;color:#000}.full{width:100%;margin-top:8px}.msg{text-align:center;color:#ef4444;font-size:12px;margin-top:10px}.app{display:none}.top{background:#0c0c0c;border-bottom:1px solid #292929;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}.brand{color:#d4af37;font:700 22px Georgia}.wrap{max-width:1100px;margin:auto;padding:18px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat,.res{background:#151515;border:1px solid #292929;border-radius:13px;padding:15px}.stat b{font-size:25px}.stat small,.muted{display:block;color:#999;font-size:12px;margin-top:4px}.filters{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0}.filter{background:#151515;color:#ddd;border:1px solid #333;border-radius:20px;padding:8px 12px;cursor:pointer}.filter.active{background:#d4af37;color:#000}.res{margin:9px 0}.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.badge{padding:5px 9px;border-radius:15px;background:#292929;font-size:10px}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.act{background:#242424;color:#fff;border:1px solid #444;border-radius:8px;padding:9px 11px;cursor:pointer}.ok{background:#1d6b45}.bad{background:#7b2525}.wa{background:#176b43}.empty{text-align:center;color:#777;padding:30px}@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}</style><meta name="theme-color" content="#0a0a0a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Elegance Admin"><link rel="manifest" href="/admin.webmanifest"><link rel="apple-touch-icon" href="/icons/elegance-192.png">
+</head><body>
+<div id="login" class="login"><div class="card"><div class="logo">ELEGANCE BARBER</div><div class="sub">CENTRO DE ADMINISTRACIÓN · PISTÉ</div><input id="user" class="input" value="EdgarMay" placeholder="Usuario"><input id="pass" class="input" type="password" placeholder="Contraseña"><button id="loginBtn" class="btn gold full">INGRESAR</button><div id="loginMsg" class="msg"></div></div></div>
+<div id="app" class="app"><header class="top"><div class="brand">ELEGANCE BARBER · ADMIN</div><button id="logout" class="btn">Salir</button></header><main class="wrap"><div class="stats"><div class="stat">🔴 <b id="nPend">0</b><small>Pendientes</small></div><div class="stat">🟢 <b id="nConf">0</b><small>Confirmadas</small></div><div class="stat">✂️ <b id="nServ">0</b><small>En servicio</small></div><div class="stat">✅ <b id="nAt">0</b><small>Atendidas</small></div></div><div class="row"><h2>Agenda de citas</h2><button id="refresh" class="btn gold">Actualizar</button> <button id="promotionsToggle" class="btn">Servicios y promociones</button></div><div class="filters"><button class="filter active" data-f="todas">Todas</button><button class="filter" data-f="pendiente">🔴 Pendientes</button><button class="filter" data-f="confirmada">🟢 Confirmadas</button><button class="filter" data-f="en_servicio">✂️ En servicio</button><button class="filter" data-f="atendida">✅ Atendidas</button></div><div id="list"></div>
+<section id="promotionsPanel" style="display:none">
+  <div class="row"><h2>Servicios y promociones</h2><button id="backToReservations" class="btn">Volver a citas</button></div>
+  <div id="promotionsRoot"></div>
+</section>
+</main></div>
+<script src="/config.js"></script>
+<script>
+const URL=SUPABASE_URL,KEY=SUPABASE_KEY;let token='',reservations=[],filter='todas';
+const $=id=>document.getElementById(id);
+async function rpc(name,args){const r=await fetch(URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});let d;try{d=await r.json()}catch(e){d={message:'Respuesta inválida del servidor'}}if(!r.ok)throw new Error(d.message||d.error_description||'Error de conexión con Supabase');return d}
+window.__eleganceAdminBridge={rpc,getToken:()=>token};
+$('loginBtn').onclick=async()=>{try{const d=await rpc('barber_admin_login',{p_username:$('user').value.trim(),p_password:$('pass').value});token=d.token;sessionStorage.setItem('barber_admin_token',token);$('login').style.display='none';$('app').style.display='block';await refreshAll()}catch(e){$('loginMsg').textContent=e.message}};
+$('pass').onkeydown=e=>{if(e.key==='Enter')$('loginBtn').click()};$('logout').onclick=()=>{sessionStorage.removeItem('barber_admin_token');location.reload()};$('refresh').onclick=refreshAll;
+document.querySelectorAll('.filter').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');filter=b.dataset.f;render()});
+function status(s){return({pendiente:'PENDIENTE',confirmada:'CONFIRMADA',en_servicio:'EN SERVICIO',atendida:'ATENDIDA',rechazada:'RECHAZADA',cancelada:'CANCELADA'})[s]||s}
+function wa(r,msg){const p=String(r.telefono||'').replace(/\D/g,'');if(!p)return alert('No hay teléfono válido.');open('https://wa.me/52'+p+'?text='+encodeURIComponent(msg),'_blank')}
+async function setStatus(id,state){try{const r=reservations.find(x=>x.id===id);await rpc('barber_admin_set_status',{p_token:token,p_id:id,p_estado:state});if(r&&(state==='confirmada'||state==='rechazada'||state==='cancelada')){const m=state==='confirmada'?'✅ CITA CONFIRMADA - Elegance Barber Pisté\n\nHola '+r.nombre+', tu cita ha sido confirmada.\n\n📅 '+r.fecha+'\n🕐 '+r.hora+'\n💈 '+r.barbero+'\n✂️ '+r.servicio+'\n💰 $'+r.precio+'\n\nTe esperamos.':state==='rechazada'?'❌ CITA NO DISPONIBLE - Elegance Barber Pisté\n\nHola '+r.nombre+', no fue posible confirmar tu cita de '+r.hora+'. Por favor contáctanos.':'⚠️ CITA CANCELADA - Elegance Barber Pisté\n\nHola '+r.nombre+', tu cita de '+r.hora+' fue cancelada.';wa(r,m)}await refreshAll()}catch(e){alert(e.message)}}
+function render(){
+ const rows=filter==='todas'?reservations:reservations.filter(x=>x.estado===filter);
+ const list=$('list'); list.innerHTML='';
+ if(!rows.length){list.innerHTML='<div class="empty">No hay reservas en este estado.</div>';return}
+ rows.forEach(r=>{
+   const article=document.createElement('article'); article.className='res';
+   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   let actions='';
+   if(r.estado==='pendiente') actions+='<button class="act ok" data-action="confirmada">✓ Aceptar y WhatsApp</button><button class="act bad" data-action="rechazada">✕ Rechazar</button>';
+   if(r.estado==='confirmada') actions+='<button class="act ok" data-action="en_servicio">✂ Iniciar servicio</button><button class="act bad" data-action="cancelada">Cancelar</button>';
+   if(r.estado==='en_servicio') actions+='<button class="act ok" data-action="pos">💳 Cobrar en POS</button><button class="act" data-action="atendida">✓ Finalizar</button>';
+   actions+='<button class="act wa" data-action="whatsapp">WhatsApp</button>';
+   article.innerHTML='<div class="row"><div><b>'+safe(r.nombre)+'</b><div class="muted">📅 '+safe(r.fecha)+' · 🕐 '+safe(r.hora)+'</div><div class="muted">💈 '+safe(r.barbero)+' · ✂️ '+safe(r.servicio)+' · 💰 $'+safe(r.precio)+'</div><div class="muted">📱 '+safe(r.telefono)+' · Folio #'+safe(r.id)+'</div></div><span class="badge">'+safe(status(r.estado))+'</span></div><div class="actions">'+actions+'</div>';
+   article.querySelectorAll('button[data-action]').forEach(b=>b.addEventListener('click',()=>{
+     const action=b.dataset.action;
+     if(action==='pos'){location.href='/pos?reserva='+encodeURIComponent(r.id);return}
+     if(action==='whatsapp'){wa(r,'Hola '+r.nombre+', te contactamos de Elegance Barber Pisté.');return}
+     setStatus(r.id,action);
+   }));
+   list.appendChild(article);
+ });
+}
+async function refreshAll(){try{reservations=await rpc('barber_admin_reservations',{p_token:token})||[];$('nPend').textContent=reservations.filter(x=>x.estado==='pendiente').length;$('nConf').textContent=reservations.filter(x=>x.estado==='confirmada').length;$('nServ').textContent=reservations.filter(x=>x.estado==='en_servicio').length;$('nAt').textContent=reservations.filter(x=>x.estado==='atendida').length;render()}catch(e){if(e.message.includes('Sesión')){sessionStorage.removeItem('barber_admin_token');location.reload()}else console.error(e)}}
+const saved=sessionStorage.getItem('barber_admin_token');if(saved){token=saved;$('login').style.display='none';$('app').style.display='block';refreshAll()}setInterval(()=>{if(token)refreshAll()},5000);
+</script><script type="module">
+import { mountPromotionsAdmin } from './web-promotion-package/admin-promotions.js';
+let promotionsMounted=false;
+const panel=document.getElementById('promotionsPanel');
+const baseNodes=[document.querySelector('.stats'),document.querySelector('.filters'),document.getElementById('list')];
+document.getElementById('promotionsToggle').addEventListener('click',()=>{
+  const bridge=window.__eleganceAdminBridge;
+  if(!bridge?.getToken()){alert('Inicia sesión para administrar servicios y promociones.');return;}
+  baseNodes.forEach(node=>node.style.display='none');
+  panel.style.display='block';
+  if(!promotionsMounted){
+    try { mountPromotionsAdmin({root:document.getElementById('promotionsRoot'),rpc:bridge.rpc,token:bridge.getToken(),onError:e=>console.error('Promociones:',e)});promotionsMounted=true; }
+    catch(e){console.error(e);alert('No se pudo abrir servicios y promociones.');}
+  }
+});
+document.getElementById('backToReservations').addEventListener('click',()=>{
+  panel.style.display='none';baseNodes.forEach(node=>node.style.display='');
+});
+</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body></html>

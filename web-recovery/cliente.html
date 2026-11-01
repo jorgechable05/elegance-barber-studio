@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elegance Barber Studio - Pisté - EdgarMay</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#fff;font-family:'Inter',sans-serif}
+.header{padding:20px;text-align:center;border-bottom:1px solid #222;background:#000}
+.logo{font-family:'Cormorant Garamond',serif;font-size:26px;color:#D4AF37;letter-spacing:2px}
+.container{max-width:480px;margin:0 auto;padding:16px}
+.categoria{color:#D4AF37;font-size:11px;letter-spacing:3px;margin:24px 0 10px;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:6px}
+.service{background:#151515;border:1px solid #222;border-radius:12px;padding:10px 12px 10px 70px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;position:relative;min-height:70px;overflow:hidden}
+.service.active{border-color:#D4AF37;background:#201e00}
+.service-img{position:absolute;left:10px;top:10px;width:48px;height:48px;border-radius:9px;object-fit:cover;border:1px solid #333}.service .info h3{font-size:14px;color:#fff}
+.service .info .desc{font-size:11px;color:#888;margin-top:2px}
+.service .price{color:#D4AF37;font-weight:700;font-size:15px}
+.service .stock{font-size:10px;color:#10B981;margin-top:4px}
+.service.low .stock{color:#EF4444}
+.dates{display:flex;gap:8px;overflow-x:auto;padding:8px 0}
+.date-card{min-width:68px;background:#151515;border:1px solid #222;border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer}
+.date-card.active{background:#D4AF37;color:#000}
+.date-card.dom{opacity:0.3}
+.barberos{display:flex;gap:10px;margin:12px 0}
+.barb-btn{flex:1;padding:12px;border-radius:20px;border:1px solid #333;background:#151515;color:#fff;cursor:pointer}
+.barb-btn.active{background:#fff;color:#000}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hora{background:#151515;border:1px solid #222;border-radius:10px;padding:12px;text-align:center;cursor:pointer}
+.hora.libre{border-color:#10B98133}.hora.ocupado{border-color:#EF444433;opacity:0.4}
+.form{background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-top:20px}
+.input{width:100%;padding:12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;margin-bottom:10px}
+.btn-reserva{width:100%;padding:14px;background:#D4AF37;color:#000;border:none;border-radius:20px;font-weight:700;cursor:pointer}
+.info-horario{background:#111;border:1px solid #D4AF37;color:#D4AF37;border-radius:8px;padding:10px;text-align:center;font-size:11px;margin:12px 0}
+</style>
+<meta name="theme-color" content="#0a0a0a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Elegance Citas"><link rel="manifest" href="/reservas.webmanifest"><link rel="apple-touch-icon" href="/icons/elegance-192.png">
+</head>
+<body>
+<div class="header"><div class="logo">ELEGANCE BARBER STUDIO</div><div style="color:#888;font-size:11px;letter-spacing:2px">PistÉ • YUCATÁN • EdgarMay</div></div>
+<div class="container">
+<div class="info-horario">✂️ Lun-Sáb 1:30 PM a 8:30 PM • Dom Cerrado • Barbero EdgarMay</div>
+
+<div class="categoria">Servicios Básicos</div>
+<div class="service active" data-serv="Corte Clásico" data-id="1" data-duration="30" data-price="160" data-stock="corte" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=160&q=80" alt="Referencia Corte Clásico" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>CORTE CLÁSICO</h3><div class="desc">30m</div><div class="stock" id="stock-corte">Consultando disponibilidad...</div></div><div class="price">$160</div></div>
+<div class="service" data-serv="Corte Desvanecido" data-id="2" data-duration="30" data-price="180" data-stock="desvanecido" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=160&q=80" alt="Referencia Corte Desvanecido" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>CORTE DESVANECIDO</h3><div class="desc">30m</div><div class="stock" id="stock-desvanecido">Consultando disponibilidad...</div></div><div class="price">$180</div></div>
+<div class="service" data-serv="Corte Infantil" data-id="3" data-duration="25" data-price="130" data-stock="infantil" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=160&q=80" alt="Referencia Corte Infantil" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>CORTE INFANTIL</h3><div class="desc">No incluye desvanecido • 25m</div><div class="stock" id="stock-infantil">Consultando disponibilidad...</div></div><div class="price">$130</div></div>
+<div class="service" data-serv="Alineación de Ceja" data-id="4" data-duration="20" data-price="40" data-stock="ceja" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=160&q=80" alt="Referencia Alineación de Ceja" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>ALINEACIÓN DE CEJA</h3><div class="desc">20m</div><div class="stock" id="stock-ceja">Consultando disponibilidad...</div></div><div class="price">$40</div></div>
+<div class="service" data-serv="Alineación de Barba" data-id="5" data-duration="20" data-price="80" data-stock="barba" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=160&q=80" alt="Referencia Alineación de Barba" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>ALINEACIÓN DE BARBA</h3><div class="desc">Solo incluye agua embotellada • 20m</div><div class="stock" id="stock-barba">Consultando disponibilidad...</div></div><div class="price">$80</div></div>
+
+<div class="categoria">Servicios Adicionales</div>
+<div class="service" data-serv="Corte + Masaje" data-id="6" data-duration="45" data-price="280" data-stock="masaje" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=160&q=80" alt="Referencia Corte + Masaje" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>CORTE + MASAJE</h3><div class="desc">Solo incluye agua • 45m</div><div class="stock" id="stock-masaje">Consultando disponibilidad...</div></div><div class="price">$280</div></div>
+<div class="service" data-serv="Corte y Lavado de Cabello" data-id="7" data-duration="45" data-price="250" data-stock="lavado" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=160&q=80" alt="Referencia Corte y Lavado" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>CORTE Y LAVADO DE CABELLO</h3><div class="desc">Solo incluye agua • No incluye barba y cejas • 45m</div><div class="stock" id="stock-lavado">Consultando disponibilidad...</div></div><div class="price">$250</div></div>
+
+<div class="categoria">Servicio VIP - $400</div>
+<div class="service" data-serv="VIP" data-id="8" data-duration="60" data-price="400" data-stock="vip" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=160&q=80" alt="Referencia VIP" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>VIP</h3><div class="desc">Corte + Mascarilla + Masaje + Lavado + Bebida (Agua, Refresco, Amper o Cerveza) • Barba y ceja adicional • 60m</div><div class="stock" id="stock-vip">Consultando disponibilidad...</div></div><div class="price">$400</div></div>
+
+<div class="categoria">Servicio Premium - $550</div>
+<div class="service" data-serv="Premium" data-id="9" data-duration="90" data-price="550" data-stock="premium" onclick="sel(this)"><img class="service-img" src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=160&q=80" alt="Referencia Premium" loading="lazy" onerror="this.style.display='none'"><div class="info"><h3>PREMIUM</h3><div class="desc">Corte + Facial Completo + Lavado + Masaje + Bebida (Agua, Refresco, Amper o Cerveza) • Barba y ceja adicional • 90m</div><div class="stock" id="stock-premium">Consultando disponibilidad...</div></div><div class="price">$550</div></div>
+
+<div class="categoria">Fecha - EdgarMay</div>
+<div class="dates" id="dates"></div>
+
+<div class="categoria">Barbero</div>
+<div class="barberos">
+<button class="barb-btn active" data-barb="EdgarMay" onclick="setBarbero(this)">EdgarMay</button>
+<button class="barb-btn" data-barb="Staff 2" onclick="setBarbero(this)">Staff 2</button>
+</div>
+
+<div class="categoria">Horarios 1:30pm-8:30pm</div>
+<div class="grid" id="horas"></div>
+<div id="promotionOffer" class="form" style="display:none;margin-top:12px;border:1px solid #D4AF37;padding:12px;border-radius:10px"></div>
+
+<div class="form">
+<input class="input" id="nombre" placeholder="Tu nombre">
+<input class="input" id="tel" placeholder="WhatsApp 10 dígitos">
+<button class="btn-reserva" onclick="reservar()">Reservar por WhatsApp</button>
+<div style="text-align:center;color:#666;font-size:10px;margin-top:8px">Elegance barber piste, en un momento le confirmamos su reserva</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
+<script>
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const HORAS=["13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"];
+let serv="Corte Clásico", precio=160, barbero="EdgarMay", fecha=new Date();
+let catalog={services:[],barbers:[]};
+let selectedServiceId=1, selectedBarberId=1;
+let basePrecio=160, selectedPromotion=null;
+
+function localDate(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function getSelectedDate(){ return localDate(fecha); }
+
+function sel(el){
+  document.querySelectorAll('.service').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  serv=el.dataset.serv; basePrecio=Number(el.dataset.price); precio=basePrecio; selectedServiceId=Number(el.dataset.id); refreshPromotionOffer();
+}
+
+function setBarbero(btn){
+  document.querySelectorAll('.barb-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  barbero=btn.dataset.barb; selectedBarberId=(barbero==='EdgarMay'?1:2);
+  renderHoras();
+}
+
+function genFechas(){
+  const cont=document.getElementById('dates'); cont.innerHTML='';
+  const dias=['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  for(let i=0;i<7;i++){
+    const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+i);
+    const card=document.createElement('div');
+    card.className='date-card'+(i===0?' active':'')+(d.getDay()===0?' dom':'');
+    card.innerHTML=`<div style="font-size:10px">${i===0?'HOY':dias[d.getDay()]}</div><div style="font-weight:700">${d.getDate()}</div><div style="font-size:10px">${meses[d.getMonth()]}</div>`;
+    if(d.getDay()!==0){
+      card.onclick=()=>{document.querySelectorAll('.date-card').forEach(c=>c.classList.remove('active'));card.classList.add('active');fecha=d;localStorage.removeItem('horaSel');renderHoras();};
+    }
+    cont.appendChild(card);
+  }
+}
+
+async function renderHoras(){
+  const cont=document.getElementById('horas'); cont.innerHTML='';
+  if(!selectedBarberId) return;
+  const {data,error}=await db.rpc('barber_public_schedule',{p_fecha:getSelectedDate(),p_barbero_id:selectedBarberId});
+  if(error){ cont.innerHTML='<div style="color:#ef4444">No se pudo consultar disponibilidad.</div>'; return; }
+  const rows=data||[];
+  rows.forEach(row=>{
+    const div=document.createElement('div');
+    div.className='hora '+(row.disponible?'libre':'ocupado');
+    div.innerHTML=`${row.hora}<br><small>${row.disponible?'LIBRE':'OCUPADO'}</small>`;
+    if(row.disponible){
+      div.onclick=()=>{
+        document.querySelectorAll('.hora').forEach(x=>x.style.borderColor='#222');
+        div.style.borderColor='#D4AF37';
+        div.dataset.selected=row.hora;
+        document.querySelectorAll('.hora').forEach(x=>x.classList.remove('selected-hour'));
+        div.classList.add('selected-hour');
+        localStorage.setItem('horaSel',row.hora); refreshPromotionOffer();
+      };
+    }
+    cont.appendChild(div);
+  });
+  updateServiceAvailability(rows);
+  refreshPromotionOffer();
+}
+
+async function initCatalog(){
+  const ids={'Corte Clásico':1,'Corte Desvanecido':2,'Corte Infantil':3,'Alineación de Ceja':4,'Alineación de Barba':5,'Corte + Masaje':6,'Corte y Lavado de Cabello':7,'VIP':8,'Premium':9};
+  document.querySelectorAll('.service').forEach(el=>{if(ids[el.dataset.serv])el.dataset.id=ids[el.dataset.serv];});
+  document.querySelectorAll('.barb-btn').forEach(el=>{el.dataset.id=el.dataset.barb==='EdgarMay'?'1':'2';});
+  try {
+    const {data,error}=await db.rpc('barber_services_public');
+    if(!error && Array.isArray(data)){
+      const byId=new Map(data.map(s=>[Number(s.id),s]));
+      document.querySelectorAll('.service').forEach(el=>{
+        const service=byId.get(Number(el.dataset.id));
+        if(!service){el.style.display='none';return;}
+        el.style.display='';
+        el.dataset.price=String(service.price);
+        el.dataset.duration=String(service.duration_minutes);
+        const priceNode=el.querySelector('.price');
+        if(priceNode) priceNode.textContent='$'+Number(service.price).toFixed(0);
+        const desc=el.querySelector('.desc');
+        if(desc) desc.textContent=service.duration_minutes+'m'+(service.description?' • '+service.description:'');
+      });
+      const active=document.querySelector('.service.active');
+      if(active){basePrecio=Number(active.dataset.price);precio=basePrecio;}
+    }
+  } catch(error){
+    console.warn('No se pudo cargar catálogo administrable',error);
+  }
+  genFechas();
+  renderHoras();
+}
+
+function updateServiceAvailability(rows){
+  const list=Array.isArray(rows)?rows:[];
+  document.querySelectorAll('.service').forEach(el=>{
+    const needed=Math.max(1,Math.ceil(Number(el.dataset.duration||30)/30));
+    let available=0;
+    for(let i=0;i<=list.length-needed;i++){
+      let ok=true;
+      for(let j=0;j<needed;j++){
+        if(!list[i+j]||!list[i+j].disponible){ok=false;break;}
+      }
+      if(ok) available++;
+    }
+    const node=el.querySelector('.stock');
+    if(node) node.textContent=available>0?(available===1?'1 espacio disponible':available+' espacios disponibles'):'Sin disponibilidad';
+    el.classList.toggle('low',available===0);
+  });
+}
+
+function escapeHtml(value){
+  return String(value==null?'':value).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+async function refreshPromotionOffer(){
+  const box=document.getElementById('promotionOffer');
+  if(!box) return;
+  selectedPromotion=null;
+  precio=basePrecio;
+  const hora=localStorage.getItem('horaSel');
+  if(!hora){box.style.display='none';return;}
+  try{
+    const results=await Promise.all([
+      db.rpc('barber_promotions_public'),
+      import('./web-promotion-package/customer-promotion-utils.js')
+    ]);
+    const result=results[0], utils=results[1];
+    if(result.error) throw result.error;
+    const appointment=new Date(getSelectedDate()+'T'+hora+':00-06:00');
+    const eligible=utils.applicablePromotions(result.data||[],selectedServiceId,appointment.toISOString());
+    const baseRounded=Math.round(basePrecio);
+    const offers=eligible.map(p=>({promotion:p,price:utils.calculatePromotionPrice(basePrecio,p)}))
+      .filter(x=>x.price<baseRounded).sort((a,b)=>a.price-b.price);
+    if(!offers.length){box.style.display='none';return;}
+    selectedPromotion=offers[0].promotion;
+    precio=offers[0].price;
+    box.style.display='block';
+    box.innerHTML=
+      '<div style="color:#D4AF37;font-weight:700">PROMOCIÓN DISPONIBLE</div>'+
+      '<div style="font-size:12px;color:#ddd;margin-top:5px">'+escapeHtml(selectedPromotion.title||selectedPromotion.description||'Descuento especial')+'</div>'+
+      '<div style="margin-top:6px"><span style="color:#888;text-decoration:line-through">$'+baseRounded+'</span> '+
+      '<b style="color:#10B981;font-size:18px">$'+precio+'</b></div>'+
+      '<div style="font-size:10px;color:#888;margin-top:4px">Aplicable para la fecha, hora y servicio seleccionados.</div>';
+  }catch(error){
+    box.style.display='none';
+    selectedPromotion=null;
+    precio=Math.round(basePrecio);
+    console.warn('No se pudieron consultar promociones',error);
+  }
+}
+
+async function reservar(){
+  const nombre=document.getElementById('nombre').value.trim();
+  const tel=document.getElementById('tel').value.trim();
+  const hora=localStorage.getItem('horaSel');
+  if(!nombre||!tel||!hora){alert('Completa nombre, tel y hora 1:30pm-8:30pm');return;}
+  const {data,error}=await db.rpc('barber_create_reservation_with_promotion',{
+    p_nombre:nombre,p_telefono:tel,p_servicio_id:selectedServiceId,p_barbero_id:selectedBarberId,
+    p_fecha:getSelectedDate(),p_hora:hora,p_notas:'',p_promotion_id:selectedPromotion&&selectedPromotion.id?selectedPromotion.id:null
+  });
+  if(error){alert(error.message.replace(/^.*?: /,''));await renderHoras();return;}
+  const reservationId=typeof data==='string'?data:(data&&data.id?data.id:String(data||''));
+  const finalPrice=Number.isFinite(Number(precio))?Math.round(Number(precio)):Math.round(basePrecio);
+  const msg='Hola, soy '+nombre+'. Quiero reservar '+serv+' $'+finalPrice+' con '+barbero+' el '+
+    fecha.toLocaleDateString('es-MX')+' a las '+hora+'. Tel: '+tel+
+    '. Elegance Barber Pisté, en un momento le confirmamos su reserva. Folio '+reservationId+'.';
+  window.open('https://wa.me/529851254721?text='+encodeURIComponent(msg),'_blank');
+  const fechaTexto=fecha.toLocaleDateString('es-MX',{day:'numeric',month:'long'});
+  const confirm=document.createElement('div');
+  confirm.className='form';
+  confirm.innerHTML='<div style="text-align:center">'+
+    '<div style="color:#10B981;font-weight:700;font-size:15px;margin-bottom:12px">✅ Reserva realizada</div>'+
+    '<div style="font-size:12px;color:#ddd;line-height:1.9">📅 '+escapeHtml(fechaTexto)+'<br>🕐 '+escapeHtml(hora)+'<br>💈 '+escapeHtml(barbero)+'<br>✂️ '+escapeHtml(serv)+'<br>💰 $'+finalPrice+'</div>'+
+    '<button class="btn-reserva" type="button" style="margin-top:12px">Confirmar por WhatsApp</button>'+
+    '<div style="color:#777;font-size:10px;margin-top:8px">WhatsApp de Elegance Barber</div></div>';
+  confirm.querySelector('button').onclick=function(){
+    const text='ELEGANCE BARBER STUDIO\n\n✅ RESERVA REALIZADA\n📅 '+fechaTexto+'\n🕐 '+hora+'\n💈 '+barbero+'\n✂️ '+serv+'\n💰 $'+finalPrice+'\nFolio '+reservationId;
+    window.open('https://wa.me/529851254721?text='+encodeURIComponent(text),'_blank');
+  };
+  document.querySelector('.container').appendChild(confirm);
+  alert('Reserva recibida. Quedó pendiente de confirmación por el administrador.');
+  localStorage.removeItem('horaSel');
+  document.getElementById('nombre').value='';
+  document.getElementById('tel').value='';
+  selectedPromotion=null;
+  await renderHoras();
+}
+initCatalog();
+setInterval(renderHoras,5000);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body>
+</html>
