@@ -81,15 +81,22 @@ export function mountPromotionsAdmin({
       services = Array.isArray(serviceRows) ? serviceRows : [];
       promotions = Array.isArray(promotionRows) ? promotionRows : [];
       packages = Array.isArray(packageRows) ? packageRows : [];
-      const [metricRows, settingsRows, historyRows] = await Promise.all([
+      const [metricRows, settingsRows, historyRows, evidenceRows, historySettingsRows] = await Promise.all([
         rpc("barber_promotions_admin_metrics", {p_token:token}).catch(() => null),
         rpc("barber_promotion_suggestion_settings_admin_get", {p_token:token}).catch(() => null),
         rpc("barber_service_sales_history_admin_list", {p_token:token,p_lookback_days:30}).catch(() => null),
+        rpc("barber_promotions_suggestion_evidence_admin_list", {p_token:token}).catch(() => null),
+        rpc("barber_promotion_history_settings_admin_get", {p_token:token}).catch(() => null),
       ]);
       metrics = Array.isArray(metricRows) ? metricRows : [];
       historyMetrics = Array.isArray(historyRows) ? historyRows : [];
       if (Array.isArray(settingsRows) && settingsRows[0]) suggestionSettings = settingsRows[0];
       else if (settingsRows && !Array.isArray(settingsRows)) suggestionSettings = settingsRows;
+      const historySettings = Array.isArray(historySettingsRows) ? historySettingsRows[0] : historySettingsRows;
+      if (historySettings) suggestionSettings = {...suggestionSettings,...historySettings};
+      const evidenceById = new Map((Array.isArray(evidenceRows) ? evidenceRows : [])
+        .map(item => [String(item.id),item.suggestion_evidence]));
+      promotions.forEach(item => { item.suggestion_evidence = evidenceById.get(String(item.id)) || null; });
       render();
     } catch (error) { onError(error); }
   }
@@ -145,6 +152,8 @@ export function mountPromotionsAdmin({
             });
             if (unitCost.value.trim() !== "") {
               await rpc("barber_service_unit_cost_admin_save", {p_token:token,p_service_id:service.id,p_unit_cost:Number(unitCost.value)});
+            } else if (service.unit_cost != null) {
+              await rpc("barber_service_unit_cost_admin_clear", {p_token:token,p_service_id:service.id});
             }
             form.onsubmit = originalSubmit; await refresh();
           } catch(error) { status.textContent=error.message; onError(error); }
@@ -251,6 +260,9 @@ export function mountPromotionsAdmin({
     const suggestionPercent = el("input",{type:"number",min:"1",max:"90",step:"0.5",value:String(suggestionSettings.discount_percent ?? 10)});
     const suggestionLimit = el("input",{type:"number",min:"1",max:"10",step:"1",value:String(suggestionSettings.max_suggestions_per_day ?? 3)});
     const suggestionWindow = el("input",{type:"number",min:"1",max:"168",step:"1",value:String(suggestionSettings.opportunity_window_hours ?? 24)});
+    const lookbackDays = el("input",{type:"number",min:"7",max:"180",step:"1",value:String(suggestionSettings.lookback_days ?? 30)});
+    const minMarginPercent = el("input",{type:"number",min:"0",max:"95",step:"1",value:String(suggestionSettings.minimum_margin_percent ?? 20)});
+    const minMarginSample = el("input",{type:"number",min:"1",max:"100",step:"1",value:String(suggestionSettings.minimum_margin_sample ?? 3)});
     const saveSettings = el("button",{type:"submit"},"Guardar reglas diarias");
     const settingsStatus = el("p",{className:"eb-muted"},"Las sugerencias priorizan ventas del periodo y margen estimado con costos capturados al cobrar. Ventas antiguas sin costo guardado no se usan para inventar márgenes; con datos insuficientes, la sugerencia queda identificada como heurística.");
     settingsForm.append(
@@ -258,6 +270,9 @@ export function mountPromotionsAdmin({
       formField("Descuento sugerido (%)",suggestionPercent),
       formField("Máximo de sugerencias por día",suggestionLimit),
       formField("Ventana de oportunidad (horas)",suggestionWindow),
+      formField("Historial de ventas analizado (días)",lookbackDays),
+      formField("Margen mínimo deseado (%)",minMarginPercent),
+      formField("Ventas con costo requeridas para evaluar margen",minMarginSample),
       saveSettings
     );
     settingsForm.onsubmit = async event => {
@@ -269,8 +284,15 @@ export function mountPromotionsAdmin({
           p_max_suggestions_per_day:Number(suggestionLimit.value),
           p_opportunity_window_hours:Number(suggestionWindow.value)
         });
-        suggestionSettings = saved || {enabled:suggestionsEnabled.checked,discount_percent:Number(suggestionPercent.value),max_suggestions_per_day:Number(suggestionLimit.value),opportunity_window_hours:Number(suggestionWindow.value)};
-        settingsStatus.textContent = "Reglas diarias guardadas.";
+        const historySaved = await rpc("barber_promotion_history_settings_admin_save",{
+          p_token:token,p_lookback_days:Number(lookbackDays.value),
+          p_minimum_margin_percent:Number(minMarginPercent.value),
+          p_minimum_margin_sample:Number(minMarginSample.value)
+        });
+        suggestionSettings = {...(saved || {}),...(historySaved || {}),enabled:suggestionsEnabled.checked,
+          discount_percent:Number(suggestionPercent.value),max_suggestions_per_day:Number(suggestionLimit.value),
+          opportunity_window_hours:Number(suggestionWindow.value)};
+        settingsStatus.textContent = "Reglas guardadas. El generador prioriza demanda observada y margen solo si existe una muestra de costos suficiente; el resto queda marcado como heurístico.";
       } catch(error) { settingsStatus.textContent = error.message; onError(error); }
     };
     content.append(el("h3",{},"Reglas de sugerencias diarias"),settingsForm,settingsStatus,
