@@ -361,9 +361,9 @@ begin
     where r.barbero=new.barbero and r.fecha=new.fecha
       and (new.id is null or r.id<>new.id)
       and lower(coalesce(r.estado,'pendiente')) not in ('rechazada','cancelada','atendida')
-      and (left(trim(r.hora),5)::time::timestamp + r.fecha::timestamp)
+      and (r.fecha::timestamp + left(trim(r.hora),5)::time)
           < v_end
-      and v_start < ((left(trim(r.hora),5)::time::timestamp + r.fecha::timestamp)
+      and v_start < ((r.fecha::timestamp + left(trim(r.hora),5)::time)
         + make_interval(mins=>coalesce(r.duracion_minutos,s.duration_minutes,30)))
   ) then
     raise exception 'El horario se cruza con otra cita para este barbero' using errcode='23P01';
