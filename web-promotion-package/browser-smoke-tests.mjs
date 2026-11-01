@@ -70,8 +70,9 @@ function rpcFixture(name, args = {}) {
         estado:"confirmada", fecha:"2026-11-02"
       }];
     case "barber_admin_sales":
-    case "barber_promotions_admin_list":
       return [];
+    case "barber_promotions_admin_list":
+      return useLocalPostgrest ? [] : [promotion];
     case "barber_services_admin_list":
     case "barber_services_public":
       return services;
@@ -307,6 +308,16 @@ async function main() {
       "Admin should request the promotions list through the active RPC endpoint");
     if (useLocalPostgrest) {
       await admin.getByText("CI browser promotion integration").waitFor({state:"visible",timeout:10000});
+    } else {
+      await admin.getByRole("button", {name:"Editar"}).first().click();
+      await admin.locator(".eb-promotions-admin input[type=text]").first().fill("Promoción de prueba editada");
+      await admin.getByRole("button", {name:"Guardar cambios como borrador"}).click();
+      await waitForRpcCall("barber_promotion_admin_save");
+      const editCall = [...observedRpcCalls,...calls].filter(call => call.name === "barber_promotion_admin_save").at(-1);
+      assert.equal(editCall.args.p_id, "promo-test-1", "Editing must update the existing promotion rather than create a duplicate");
+      assert.equal(editCall.args.p_title, "Promoción de prueba editada");
+      assert.equal([...observedRpcCalls,...calls].some(call => call.name === "barber_promotion_admin_review" && call.args.p_decision === "approved"), false,
+        "Saving an edited promotion must not publish it automatically");
     }
 
     // Customer: public services/schedule, approved offer display, reservation call
