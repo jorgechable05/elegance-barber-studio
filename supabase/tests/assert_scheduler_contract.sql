@@ -18,6 +18,15 @@ BEGIN
     RAISE EXCEPTION 'service_role must be able to execute the internal scheduler RPC';
   END IF;
 
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron') AND NOT EXISTS (
+    SELECT 1 FROM cron.job
+    WHERE jobname='elegance-promotion-suggestions-daily'
+      AND schedule='0 12 * * *'
+      AND command='select public.barber_promotions_generate_daily_suggestions_internal();'
+  ) THEN
+    RAISE EXCEPTION 'pg_cron is installed but the daily promotion job is missing or misconfigured';
+  END IF;
+
   v_first := public.barber_promotions_generate_daily_suggestions_internal();
   IF v_first < 1 OR v_first > 3 THEN
     RAISE EXCEPTION 'Expected 1-3 pending suggestions on first run, got %', v_first;
