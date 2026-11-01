@@ -42,17 +42,31 @@ end;
 $$;
 
 create or replace function public.barber_admin_sales(p_token uuid)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $
 begin
  if not exists(select 1 from public.barber_admin_sessions s where s.token=p_token and s.revoked_at is null and s.expires_at>now()) then
   raise exception 'Sesión de prueba inválida o vencida' using errcode='28000';
  end if;
- return coalesce((select jsonb_agg(jsonb_build_object(
-  'folio',folio,'total',total,'cliente',cliente,'servicio',servicio,'barbero',barbero,
-  'metodo',metodo,'efectivo',efectivo,'tarjeta',tarjeta) order by id desc)
-  from public.ci_barber_sales),'[]'::jsonb);
+ -- The mixed-payment migration delegates to the legacy six-argument RPC,
+ -- which persists to public.barber_sales. Read that real contract table as
+ -- well as the older CI-only fixture table so HTTP integration verifies the
+ -- same rows the production-shaped wrapper actually writes.
+ return coalesce((
+  select jsonb_agg(jsonb_build_object(
+    'folio',sales.folio,'total',sales.total,'cliente',sales.cliente,
+    'servicio',sales.servicio,'barbero',sales.barbero,'metodo',sales.metodo,
+    'efectivo',sales.efectivo,'tarjeta',sales.tarjeta)
+    order by sales.created_at desc, sales.id desc)
+  from (
+    select id,folio,cliente,servicio,barbero,total,metodo,efectivo,tarjeta,creado as created_at
+      from public.barber_sales
+    union all
+    select id,folio,cliente,servicio,barbero,total,metodo,efectivo,tarjeta,created_at
+      from public.ci_barber_sales
+  ) as sales
+ ),'[]'::jsonb);
 end;
-$$;
+$;
 
 create or replace function public.barber_admin_create_walkin_sale(
  p_token uuid,p_cliente text,p_servicio_id integer,p_barbero_id integer,p_metodo text,p_recibido numeric,
