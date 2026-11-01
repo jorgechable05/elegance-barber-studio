@@ -27,10 +27,7 @@ BEGIN
   INSERT INTO public.barber_promotion_services(promotion_id,service_id)
   VALUES(v_source,1),(v_delete,2);
 
-  UPDATE public.barber_promotion_suggestion_settings
-    SET enabled=true,discount_percent=12,max_suggestions_per_day=2,
-        opportunity_window_hours=36,updated_at=now()
-    WHERE id=1;
+  PERFORM public.barber_promotion_suggestion_settings_admin_save(v_token,true,12,2,36);
   SELECT * INTO v_settings
     FROM public.barber_promotion_suggestion_settings_admin_get(v_token);
   IF v_settings.discount_percent<>12 OR v_settings.max_suggestions_per_day<>2
@@ -96,5 +93,25 @@ BEGIN
   IF NOT v_blocked THEN
     RAISE EXCEPTION 'Metrics RPC accepted an invalid admin session';
   END IF;
-END $$;
+
+  -- Cannot approve an expired promotion even with a valid admin session.
+  INSERT INTO public.barber_promotions(
+    id,title,description,status,discount_type,discount_value,starts_at,ends_at,
+    weekdays,source
+  ) VALUES (
+    '33333333-3333-4333-8333-333333333303','Expired approval guard','Synthetic test',
+    'draft','percent',10,now()-interval '3 days',now()-interval '1 day',
+    ARRAY[0,1,2,3,4,5,6]::smallint[],'manual'
+  );
+  INSERT INTO public.barber_promotion_services(promotion_id,service_id)
+  VALUES('33333333-3333-4333-8333-333333333303',3);
+  v_blocked := false;
+  BEGIN
+    PERFORM public.barber_promotion_admin_review(v_token,'33333333-3333-4333-8333-333333333303','approved');
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Expired promotion was approved';
+  END IF;
+END $;
 ROLLBACK;
