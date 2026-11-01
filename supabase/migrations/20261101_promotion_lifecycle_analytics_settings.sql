@@ -127,7 +127,7 @@ create or replace function public.barber_promotion_admin_review(p_token uuid, p_
 returns public.barber_promotions
 language plpgsql security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 declare v_row public.barber_promotions;
 begin
   if not exists (
@@ -171,7 +171,7 @@ begin
    where id=p_id returning * into v_row;
   return v_row;
 end;
-$;
+$$;
 
 -- Truthful metrics from reservation records only. This schema cannot yet attribute completed sales
 -- or calculate discount savings because sales do not carry promotion_id/base price.
