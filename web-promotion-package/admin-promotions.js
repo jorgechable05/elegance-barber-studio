@@ -240,6 +240,10 @@ export function mountPromotionsAdmin({
       const row = el("div",{className:"eb-item"});
       row.append(el("strong",{},promo.title), el("p",{className:"eb-status"},`Estado: ${promo.status} · ${promo.discount_type==="percent"?promo.discount_value+"%":"$"+promo.discount_value}`));
       row.append(el("p",{className:"eb-muted"},`${new Date(promo.starts_at).toLocaleString()} — ${new Date(promo.ends_at).toLocaleString()}`));
+      const metric = metrics.find(item => String(item.id) === String(promo.id));
+      if (metric) {
+        row.append(el("p",{className:"eb-muted"},`Reservas: ${Number(metric.reservation_count||0)} · Importe reservado: ${Number(metric.booked_revenue||0).toFixed(2)} · Contador de usos: ${Number(metric.usage_counter||0)}`));
+      }
       const edit=el("button",{},"Editar");
       edit.onclick=()=>{
         editingPromotionId=promo.id;
