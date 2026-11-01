@@ -56,7 +56,7 @@ $$;
 
 create or replace function public.barber_admin_create_walkin_sale(
  p_token uuid,p_cliente text,p_servicio_id integer,p_barbero_id integer,p_metodo text,p_recibido numeric,
- p_efectivo numeric default null,p_tarjeta numeric default null
+ p_efectivo numeric,p_tarjeta numeric
 ) returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
 declare
  v_total numeric(12,2); v_cash numeric(12,2); v_card numeric(12,2);
