@@ -20,8 +20,8 @@ export function mountPromotionsAdmin({
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
       if (key === "className") node.className = value;
-      else if (key === "type" || key === "min" || key === "step" || key === "value" || key === "disabled") node[key] = value;
       else if (key.startsWith("aria-") || key === "role") node.setAttribute(key, String(value));
+      else if (key in node) node[key] = value;
     }
     if (text) node.textContent = text;
     return node;
@@ -56,6 +56,7 @@ export function mountPromotionsAdmin({
   let services = [];
   let promotions = [];
   let view = "services";
+  let editingPromotionId = null;
 
   const formField = (label, input) => {
     const wrapper = el("label");
@@ -157,10 +158,13 @@ export function mountPromotionsAdmin({
       formField("Hora inicial diaria",fromTime), formField("Hora final diaria",toTime),
       formField("Servicios activos (selecciona uno o más)",servicesSelect), formField("Usos máximos (opcional)",maxUses),
       formField("Días (hora local del negocio)",days));
-    const save = el("button",{type:"submit"},"Guardar como borrador");
+    const save = el("button",{type:"submit"},editingPromotionId ? "Guardar cambios como borrador" : "Guardar como borrador");
+    const cancelEdit = el("button",{type:"button"},"Cancelar edición");
+    cancelEdit.hidden = !editingPromotionId;
     const suggest = el("button",{type:"button"},"Generar sugerencias para revisión");
     const message = el("p",{className:"eb-muted"});
-    content.append(el("h3",{},"Crear promoción"),form,save,suggest,message);
+    content.append(el("h3",{},editingPromotionId ? "Editar promoción" : "Crear promoción"),form,save,cancelEdit,suggest,message);
+    cancelEdit.onclick = () => { editingPromotionId = null; renderPromotions(); };
     form.onsubmit = async event => {
       event.preventDefault();
       try {
@@ -168,13 +172,14 @@ export function mountPromotionsAdmin({
         if (!serviceIds.length) throw new Error("Selecciona al menos un servicio.");
         const weekDays = dayChecks.filter(c=>c.checked).map(c=>Number(c.value));
         await rpc("barber_promotion_admin_save",{
-          p_token:token,p_id:null,p_title:title.value.trim(),p_description:desc.value.trim(),
+          p_token:token,p_id:editingPromotionId,p_title:title.value.trim(),p_description:desc.value.trim(),
           p_discount_type:type.value,p_discount_value:Number(value.value),
           p_starts_at:new Date(start.value).toISOString(),p_ends_at:new Date(end.value).toISOString(),
           p_weekdays:weekDays,p_start_time:fromTime.value||null,p_end_time:toTime.value||null,
           p_service_ids:serviceIds,p_max_uses:maxUses.value?Number(maxUses.value):null
         });
         message.textContent="Guardada como borrador. No aparece al público hasta aprobación.";
+        editingPromotionId = null;
         await refresh();
       } catch(error) { message.textContent=error.message; onError(error); }
     };
@@ -191,6 +196,33 @@ export function mountPromotionsAdmin({
       const row = el("div",{className:"eb-item"});
       row.append(el("strong",{},promo.title), el("p",{className:"eb-status"},`Estado: ${promo.status} · ${promo.discount_type==="percent"?promo.discount_value+"%":"$"+promo.discount_value}`));
       row.append(el("p",{className:"eb-muted"},`${new Date(promo.starts_at).toLocaleString()} — ${new Date(promo.ends_at).toLocaleString()}`));
+      const edit=el("button",{},"Editar");
+      edit.onclick=()=>{
+        editingPromotionId=promo.id;
+        title.value=promo.title||"";
+        desc.value=promo.description||"";
+        type.value=promo.discount_type;
+        value.value=promo.discount_value;
+        const asLocalInput=(raw)=>{
+          const d=new Date(raw);
+          if(!Number.isFinite(d.getTime())) return "";
+          const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+          return local.toISOString().slice(0,16);
+        };
+        start.value=asLocalInput(promo.starts_at);
+        end.value=asLocalInput(promo.ends_at);
+        fromTime.value=promo.start_time ? String(promo.start_time).slice(0,5) : "";
+        toTime.value=promo.end_time ? String(promo.end_time).slice(0,5) : "";
+        dayChecks.forEach(check=>check.checked=(promo.weekdays||[]).map(Number).includes(Number(check.value)));
+        const selected=new Set((promo.service_ids||[]).map(String));
+        Array.from(servicesSelect.options).forEach(option=>option.selected=selected.has(option.value));
+        maxUses.value=promo.max_uses ?? "";
+        save.textContent="Guardar cambios como borrador";
+        cancelEdit.hidden=false;
+        content.querySelector("h3").textContent="Editar promoción";
+        form.scrollIntoView({behavior:"smooth",block:"start"});
+      };
+      row.append(edit);
       if (promo.status==="pending_review" || promo.status==="draft") {
         const approve=el("button",{},"Aprobar");
         approve.onclick=()=>review(promo.id,"approved");
