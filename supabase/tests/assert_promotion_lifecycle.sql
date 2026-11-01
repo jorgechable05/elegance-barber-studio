@@ -7,7 +7,7 @@ DECLARE
   v_source uuid := '33333333-3333-4333-8333-333333333301';
   v_delete uuid := '33333333-3333-4333-8333-333333333302';
   v_copy public.barber_promotions;
-  v_settings public.barber_promotion_suggestion_settings;
+  v_settings record;
   v_created integer;
   v_count bigint;
   v_revenue numeric;
