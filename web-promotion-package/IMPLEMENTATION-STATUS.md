@@ -51,3 +51,14 @@
 - [ ] La generación diaria es heurística configurable, no una predicción de demanda ni de margen: actualmente no hay suficientes datos fiables de coste/margen ni atribución de ventas.
 - [ ] Promociones por paquete siguen pendientes: el modelo de reserva actual representa un solo servicio por reserva y el POS actual cobra un único servicio o una reserva; no debe presentarse un paquete multid servicio como funcional sin ampliar carrito/contrato de reservas con regresión.
 - [ ] Se mantiene pendiente la certificación en Supabase no productivo y la comprobación del scheduler real. La CI usa PostgreSQL temporal y `pg_cron` de test solamente.
+
+## Estado posterior a la ampliación de POS (2026-11-01)
+- [x] El POS aislado consulta el catálogo administrable de servicios y ofrece promociones aprobadas aplicables a venta sin reserva; el servidor vuelve a comprobar servicio, estado, vigencia, días, horario y límite de usos antes de cobrar.
+- [x] El ticket de POS incorpora subtotal, nombre de promoción cuando corresponda, descuento y total. Las ventas con reserva conservan el precio base y el identificador de promoción fijados al reservar, sin recalcular reservas históricas.
+- [x] Las RPC nuevas para POS registran atribución de promoción y descuento; la validación del pago mixto usa el total descontado y exige que efectivo + tarjeta sume exactamente el total.
+- [x] CI añade pruebas SQL para venta de mostrador con promoción, cambio en efectivo, división de pago mixto, rechazo y rollback ante división inválida, y persistencia de la promoción aplicada a una reserva.
+- [x] Última ejecución aislada completa aprobada en commit `55a48acf8cc07847594794cead7227e62788ea40`: https://github.com/jorgechable05/elegance-barber-studio/actions/runs/41338584122 (33/33 pasos en verde, PostgreSQL temporal + PostgREST local + Playwright).
+- [ ] **Paquetes mult-servicio no certificados ni implementados como compra única.** El modelo actual de reserva y POS sigue representando un solo servicio por turno; mostrar un paquete requiere un carrito/contrato multi-servicio y pruebas de disponibilidad, cancelación, precio e inventario antes de ofrecerlo al público.
+- [ ] **Backend real y scheduler remoto siguen sin certificar.** Todas las pruebas anteriores usan PostgreSQL temporal/PostgREST local y fixtures sintéticas; todavía se necesita un proyecto Supabase no productivo autorizado para confirmar persistencia real y `pg_cron`. No usar `elegance-piste` para esas pruebas.
+- [ ] La sugerencia diaria es configurable e idempotente, pero usa reglas heurísticas y no predice demanda ni margen porque aún no hay una fuente fiable de costes, márgenes o demanda en el esquema actual.
+- [ ] La PR sigue en borrador, sin merge ni despliegue. No se aplicaron migraciones a ningún proyecto Supabase alojado.
