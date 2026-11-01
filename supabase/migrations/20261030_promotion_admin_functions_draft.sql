@@ -232,23 +232,27 @@ $$;
 revoke all on function public.barber_promotions_generate_daily_suggestions_internal() from public, anon, authenticated;
 grant execute on function public.barber_promotions_generate_daily_suggestions_internal() to service_role;
 
--- Schedule at 12:00 UTC (~06:00 in Yucatán) only when pg_cron is already available.
--- Remove an existing job with this name first so reapplying the migration is idempotent.
+-- Schedule at 12:00 UTC (~06:00 in Yucatán).
+-- Fail loudly if pg_cron is not enabled: a successful migration must not silently omit the daily job.
+-- Remove an existing job first so rerunning this block remains idempotent.
 do $schedule$
 declare v_job_id bigint;
 begin
-  if exists (select 1 from pg_extension where extname='pg_cron') then
-    for v_job_id in
-      select jobid from cron.job where jobname='elegance-promotion-suggestions-daily'
-    loop
-      perform cron.unschedule(v_job_id);
-    end loop;
-    perform cron.schedule(
-      'elegance-promotion-suggestions-daily',
-      '0 12 * * *',
-      'select public.barber_promotions_generate_daily_suggestions_internal();'
-    );
+  if to_regclass('cron.job') is null then
+    raise exception 'pg_cron must be enabled before applying the promotions scheduler migration';
   end if;
+
+  for v_job_id in
+    select jobid from cron.job where jobname='elegance-promotion-suggestions-daily'
+  loop
+    perform cron.unschedule(v_job_id);
+  end loop;
+
+  perform cron.schedule(
+    'elegance-promotion-suggestions-daily',
+    '0 12 * * *',
+    'select public.barber_promotions_generate_daily_suggestions_internal();'
+  );
 end
 $schedule$;
 
