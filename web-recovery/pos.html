@@ -153,7 +153,7 @@ $('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinSer
 window.__elegancePosBridge={rpc,getToken:()=>token};
 function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
 </script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script type="module">
-import {mountLoyaltyStaff} from '../web-loyalty-package/staff.js';
+import {mountLoyaltyStaff} from './loyalty-staff.js';
 let mounted=false;
 document.getElementById('loyaltyToggle').addEventListener('click',()=>{
  const bridge=window.__elegancePosBridge;
