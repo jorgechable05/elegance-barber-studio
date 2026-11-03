@@ -63,6 +63,9 @@ declare
   v_name text := trim(coalesce(p_name,''));
   v_phone text := regexp_replace(coalesce(p_phone,''), '[^0-9]', '', 'g');
 begin
+  if length(v_phone)=12 and left(v_phone,2)='52' then v_phone:=substring(v_phone from 3);
+  elsif length(v_phone)=13 and left(v_phone,3)='521' then v_phone:=substring(v_phone from 4);
+  end if;
   if p_consent is distinct from true then
     raise exception 'Se requiere aceptar el aviso de privacidad' using errcode='22023';
   end if;
@@ -100,6 +103,9 @@ as $$
 declare
   v_phone text := regexp_replace(coalesce(p_phone,''), '[^0-9]', '', 'g');
 begin
+  if length(v_phone)=12 and left(v_phone,2)='52' then v_phone:=substring(v_phone from 3);
+  elsif length(v_phone)=13 and left(v_phone,3)='521' then v_phone:=substring(v_phone from 4);
+  end if;
   if not exists (
     select 1 from public.barber_admin_sessions s
     where s.token=p_token and s.revoked_at is null and s.expires_at>now()
