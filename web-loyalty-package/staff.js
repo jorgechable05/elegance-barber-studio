@@ -26,7 +26,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
       </div>
       <div id="loyaltyNotice" style="font-size:12px;margin:10px 0;color:#d4af37" role="status"></div>
       <hr style="border:0;border-top:1px solid #333;margin:16px 0">
-      <h3>Clientes registrados</h3><div id="loyaltyList" style="font-size:12px;color:#bbb">Cargando…</div>
+      <h3>Clientes registrados</h3><div id="loyaltyList" style="font-size:12px;color:#bbb">Cargando…</div><h3>Premios de cortesía</h3><div id="loyaltyRewards" style="font-size:12px;color:#bbb">Cargando…</div>
     </section>`;
   let customer=null;
   const el=id=>root.querySelector('#'+id);
@@ -36,6 +36,15 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
   async function refresh(){
     const rows=await rpc('barber_loyalty_list_customers',{p_token:token});
     el('loyaltyList').innerHTML=rows.length?rows.map(c=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(c.full_name)}</b> · ${escapeHtml(c.phone_masked)}<br>Visitas del ciclo: ${Number(c.visits_in_cycle)}/5 · Premios pendientes: ${Number(c.pending_rewards)} · Visitas históricas: ${Number(c.total_visits)}</div>`).join(''):'Todavía no hay clientes registrados.';
+    const rewards=await rpc('barber_loyalty_list_rewards',{p_token:token});
+    el('loyaltyRewards').innerHTML=rewards.length?rewards.map(r=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(r.customer_name)}</b> · ${escapeHtml(r.phone_masked)} · Ciclo ${Number(r.cycle_number)}<br>Estado: ${escapeHtml(r.status)} · ${new Date(r.earned_at).toLocaleDateString('es-MX')}${r.status==='pending'?` <button class="act ok" data-redeem="${escapeHtml(r.reward_id)}">Marcar corte entregado</button>`:''}</div>`).join(''):'Todavía no hay premios generados.';
+    el('loyaltyRewards').querySelectorAll('[data-redeem]').forEach(button=>button.addEventListener('click',async()=>{
+      const employee=el('loyaltyEmployee').value.trim();
+      if(!employee){el('loyaltyNotice').textContent='Escribe el nombre del empleado antes de entregar el premio.';return;}
+      if(!confirm('¿Confirmas que el corte de cortesía ya fue entregado?'))return;
+      try{await rpc('barber_loyalty_redeem_reward',{p_token:token,p_reward_id:button.dataset.redeem,p_employee:employee});el('loyaltyNotice').textContent='Premio marcado como entregado. El siguiente ciclo comienza desde cero.';await refresh();}
+      catch(error){el('loyaltyNotice').textContent=error.message;}
+    }));
   }
   async function find(){
     const rows=await rpc('barber_loyalty_lookup_customer',{p_token:token,p_phone:el('loyaltyPhone').value});
