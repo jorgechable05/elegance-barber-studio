@@ -10,6 +10,8 @@ create table if not exists public.barber_loyalty_customers (
   updated_at timestamptz not null default now()
 );
 
+alter table public.barber_sales add column if not exists loyalty_customer_id uuid references public.barber_loyalty_customers(id) on delete restrict;
+
 create table if not exists public.barber_loyalty_visits (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.barber_loyalty_customers(id) on delete restrict,
@@ -109,7 +111,9 @@ begin
   with c as (
     select lc.* from public.barber_loyalty_customers lc where lc.phone=v_phone
   ), last_cycle as (
-    select c.id, coalesce(max(r.cycle_number),1) as cycle_number
+    select c.id, case when count(r.id)=0 then 1
+      when bool_or(r.status='pending') then max(r.cycle_number)
+      else max(r.cycle_number)+1 end as cycle_number
     from c left join public.barber_loyalty_rewards r on r.customer_id=c.id
     group by c.id
   )
@@ -157,8 +161,11 @@ begin
    where id=p_customer_id for update;
   if not found then raise exception 'Cliente de lealtad no encontrado' using errcode='P0002'; end if;
 
-  select * into v_sale from public.barber_sales where id=p_sale_id;
+  select * into v_sale from public.barber_sales where id=p_sale_id for update;
   if not found then raise exception 'La venta no existe; registra la visita después de cobrar' using errcode='P0002'; end if;
+  if v_sale.loyalty_customer_id is not null and v_sale.loyalty_customer_id<>p_customer_id then
+    raise exception 'Esta venta ya pertenece a otro cliente del programa' using errcode='23505';
+  end if;
 
   select * into v_existing from public.barber_loyalty_visits where sale_id=p_sale_id;
   if found then
@@ -173,7 +180,9 @@ begin
     );
   end if;
 
-  select coalesce(max(cycle_number),1) into v_cycle
+  select case when count(*)=0 then 1
+      when bool_or(status='pending') then max(cycle_number)
+      else max(cycle_number)+1 end into v_cycle
     from public.barber_loyalty_rewards where customer_id=p_customer_id;
   select count(*)::integer into v_visit
     from public.barber_loyalty_visits
@@ -183,6 +192,7 @@ begin
   end if;
   v_visit:=v_visit+1;
 
+  update public.barber_sales set loyalty_customer_id=p_customer_id where id=p_sale_id;
   insert into public.barber_loyalty_visits(customer_id,sale_id,cycle_number,visit_number,registered_by)
   values(p_customer_id,p_sale_id,v_cycle,v_visit,trim(p_employee));
 
@@ -217,7 +227,9 @@ begin
   end if;
   return query
   with cycles as (
-    select c.id, coalesce(max(r.cycle_number),1) as cycle_number
+    select c.id, case when count(r.id)=0 then 1
+      when bool_or(r.status='pending') then max(r.cycle_number)
+      else max(r.cycle_number)+1 end as cycle_number
     from public.barber_loyalty_customers c
     left join public.barber_loyalty_rewards r on r.customer_id=c.id
     group by c.id
