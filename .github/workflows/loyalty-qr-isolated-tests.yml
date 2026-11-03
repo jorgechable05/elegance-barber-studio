@@ -7,7 +7,7 @@ on:
       - 'supabase/tests/loyalty-qr-contract.sql'
       - '.github/workflows/loyalty-qr-isolated-tests.yml'
   pull_request:
-    branches: [main]
+    branches: [main, feat/servicios-promociones-web]
     paths:
       - 'supabase/migrations/20261103_loyalty_*.sql'
       - 'supabase/tests/loyalty-qr-contract.sql'
