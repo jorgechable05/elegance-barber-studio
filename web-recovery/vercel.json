@@ -3,6 +3,10 @@
     {
       "source": "/fidelidad",
       "destination": "/fidelidad.html"
+    },
+    {
+      "source": "/privacidad",
+      "destination": "/privacidad.html"
     }
   ]
 }
