@@ -14,7 +14,7 @@ function response(status: number, body: Record<string, unknown>, origin: string 
   const headers = new Headers(cors);
   if (origin && allowedOrigins.has(origin)) headers.set("Access-Control-Allow-Origin", origin);
   headers.set("Vary", "Origin");
-  return new Response(JSON.stringify(body), { status, headers });
+  return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
 }
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
