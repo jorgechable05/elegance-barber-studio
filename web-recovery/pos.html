@@ -7,7 +7,16 @@
 <script src="/config.js"></script>
 <script>
 const URL=window.ELEGANCE_SUPABASE_URL||'',KEY=window.ELEGANCE_SUPABASE_ANON_KEY||'';let token='',reservas=[],selected=null,walkinPromotions=[];const $=id=>document.getElementById(id);
-async function rpc(name,args){if(!URL||!KEY)throw Error('POS sin configurar: falta el endpoint y la clave del entorno.');if(URL.includes('bvcbticzboknkmtgfkgw.supabase.co'))throw Error('Bloqueado: esta versión aislada no puede usar el backend de producción.');const r=await fetch(URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});let d;try{d=await r.json()}catch(e){d={message:'Respuesta inválida'}}if(!r.ok)throw Error(d.message||'Error de conexión');return d}
+async function rpc(name,args){if(!URL||!KEY)throw Error('POS sin configurar: falta el endpoint y la clave del entorno.');if(URL.includes('bvcbticzboknkmtgfkgw.supabase.co'))throw Error('Bloqueado: esta versión aislada no puede usar el backend de producción.');const STAFF_RPCS=new Set(["barber_admin_set_status","barber_admin_reservations","barber_admin_reservations_with_promotions","barber_admin_sales","barber_admin_create_sale","barber_admin_create_sale_with_promotion_info","barber_admin_create_sale_with_promotion_info_mixed","barber_admin_create_walkin_sale","barber_admin_create_walkin_sale_with_promotion","barber_services_admin_list","barber_service_admin_save","barber_promotions_admin_list","barber_promotions_admin_metrics","barber_promotion_suggestion_settings_admin_get","barber_promotion_suggestion_settings_admin_save","barber_promotion_admin_save","barber_promotions_generate_daily_suggestions","barber_promotion_admin_duplicate","barber_promotion_admin_delete","barber_promotion_admin_review","barber_loyalty_list_customers","barber_loyalty_list_rewards","barber_loyalty_lookup_customer","barber_loyalty_record_visit","barber_loyalty_redeem_reward"]);
+async function rpc(name,args){
+ let endpoint=URL+'/rest/v1/rpc/'+name,payload=args;
+ if(name==='barber_admin_login'){endpoint=URL+'/functions/v1/barber-admin-login';payload={username:args.p_username,password:args.p_password};}
+ else if(STAFF_RPCS.has(name)){endpoint=URL+'/functions/v1/barber-admin-rpc';payload={name,args};}
+ const r=await fetch(endpoint,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ let d;try{d=await r.json()}catch(e){d={message:'Respuesta inválida del servidor'}}
+ if(!r.ok)throw new Error(d.message||d.error_description||'Error de conexión con Supabase');
+ return d;
+}
 async function creditLoyaltyVisit(phone,saleId,employee){
  if(!phone||!saleId)return null;
  try{
