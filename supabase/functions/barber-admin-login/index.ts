@@ -1,6 +1,6 @@
-const allowedOrigins = new Set(["https://elegance-barber-piste-5j0r0px29-dell-723c.vercel.app","https://elegance-barber-piste.vercel.app"]);
+const allowedOrigins = new Set(["https://elegance-barber-piste-5j0r0px29-dell-723c.vercel.app","https://elegance-barber-piste-4lnwar1ue-dell-723c.vercel.app","https://elegance-barber-piste.vercel.app"]);
 const cors = {"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
-function reply(status:number,body:Record<string,unknown>,origin:string|null){const h=new Headers(cors);if(origin&&allowedOrigins.has(origin))h.set("Access-Control-Allow-Origin",origin);h.set("Vary","Origin");return new Response(JSON.stringify(body),{status,headers:h});}
+function reply(status:number,body:Record<string,unknown>,origin:string|null){const h=new Headers(cors);if(origin&&allowedOrigins.has(origin))h.set("Access-Control-Allow-Origin",origin);h.set("Vary","Origin");return new Response(status===204?null:JSON.stringify(body),{status,headers:h});}
 async function hashIp(ip:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(ip));return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("");}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get("origin");
