@@ -6,6 +6,7 @@ const cors = {
 const allowedOrigins = new Set([
   "https://elegance-barber-piste-i7g9vw7xt-dell-723c.vercel.app",
   "https://elegance-barber-piste-5j0r0px29-dell-723c.vercel.app",
+  "https://elegance-barber-piste-4lnwar1ue-dell-723c.vercel.app",
   "https://elegance-barber-piste.vercel.app",
 ]);
 
