@@ -33,7 +33,8 @@ Deno.serve(async (req: Request) => {
   if (origin && !allowedOrigins.has(origin)) return response(403, { error: "Origin not allowed" }, null);
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) {
+  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  if (!supabaseUrl || !serviceKey || !turnstileSecret) {
     return response(503, { error: "El servicio de registro no está configurado." }, origin);
   }
   try {
@@ -42,12 +43,19 @@ Deno.serve(async (req: Request) => {
     const phone = typeof body.phone === "string" ? body.phone : "";
     const consent = body.consent === true;
     const honeypot = typeof body.website === "string" ? body.website.trim() : "";
+    const turnstileToken = typeof body.turnstileToken === "string" ? body.turnstileToken.trim() : "";
     if (honeypot) return response(200, { message: "Registro recibido." }, origin);
+    if (!turnstileToken || turnstileToken.length > 2048) return response(400, { error: "Completa la verificación de seguridad." }, origin);
     if (name.length < 2 || name.length > 100 || phone.length < 8 || phone.length > 18 || !consent) {
       return response(400, { error: "Completa tus datos y acepta el aviso de privacidad." }, origin);
     }
     const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip");
     if (!ip) return response(400, { error: "No se pudo validar el origen de la solicitud." }, origin);
+    const verifyBody = new URLSearchParams({ secret: turnstileSecret, response: turnstileToken, remoteip: ip.trim() });
+    const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: verifyBody });
+    if (!verifyResponse.ok) return response(503, { error: "No se pudo verificar la protección anti-bots." }, origin);
+    const verification = await verifyResponse.json();
+    if (verification.success !== true || (verification.hostname && !allowedOrigins.has("https://" + verification.hostname))) return response(403, { error: "La verificación de seguridad no fue válida." }, origin);
     const headers = { apikey: serviceKey, Authorization: "Bearer " + serviceKey, "Content-Type": "application/json" };
     const rate = await fetch(supabaseUrl + "/rest/v1/rpc/barber_loyalty_allow_registration", {
       method: "POST", headers, body: JSON.stringify({ p_ip_hash: await sha256(ip.trim()) }),
