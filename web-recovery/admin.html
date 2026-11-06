@@ -55,7 +55,7 @@ async function refreshAll(){try{reservations=await rpc('barber_admin_reservation
 const saved=sessionStorage.getItem('barber_admin_token');if(saved){token=saved;$('login').style.display='none';$('app').style.display='block';refreshAll()}setInterval(()=>{if(token)refreshAll()},5000);
 </script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script type="module">
-import { mountLoyaltyStaff } from './loyalty-staff.js';
+import { mountLoyaltyStaff } from '/web-recovery/loyalty-staff.js';
 import { mountPromotionsAdmin } from './web-promotion-package/admin-promotions.js';
 let promotionsMounted=false;
 const panel=document.getElementById('promotionsPanel');
