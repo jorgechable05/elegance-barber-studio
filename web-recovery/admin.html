@@ -79,7 +79,16 @@ document.getElementById('loyaltyToggle').addEventListener('click',()=>{
   const bridge=window.__eleganceAdminBridge;
   if(!bridge || !bridge.getToken()){alert('Inicia sesión para consultar fidelidad.');return;}
   baseNodes.forEach(node=>node.style.display='none');panel.style.display='none';loyaltyPanel.style.display='block';
-  if(!loyaltyMounted){mountLoyaltyStaff({root:document.getElementById('loyaltyRoot'),rpc:bridge.rpc,token:bridge.getToken(),role:'admin'});loyaltyMounted=true;}
+  if(!loyaltyMounted){
+    const loyaltyRoot=document.getElementById('loyaltyRoot');
+    try{
+      mountLoyaltyStaff({root:loyaltyRoot,rpc:bridge.rpc,token:bridge.getToken(),role:'admin'});
+      loyaltyMounted=true;
+    }catch(error){
+      console.error('Fidelidad QR:',error);
+      loyaltyRoot.innerHTML='<div role="alert" style="margin:14px 0;padding:14px;border:1px solid #8b3434;border-radius:10px;background:#211313;color:#ffd5d5">No se pudo iniciar el módulo de fidelidad. Actualiza la página y vuelve a intentarlo. Detalle: '+String(error?.message||error).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</div>';
+    }
+  }
 });
 document.getElementById('backFromLoyalty').addEventListener('click',()=>{
   loyaltyPanel.style.display='none';baseNodes.forEach(node=>node.style.display='');
