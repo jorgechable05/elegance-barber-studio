@@ -21,7 +21,6 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
       <div id="loyaltyCustomer" style="font-size:13px;color:#ddd;margin:10px 0">Busca al cliente por teléfono para ver su avance.</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
         <input id="loyaltySaleId" class="input" type="number" min="1" step="1" placeholder="Folio/ID de venta ya cobrada">
-        <input id="loyaltyEmployee" class="input" maxlength="80" placeholder="Empleado que atendió">
         <button id="loyaltyRecord" class="btn gold" disabled>Registrar visita cobrada</button>
       </div>
       <div id="loyaltyNotice" style="font-size:12px;margin:10px 0;color:#d4af37" role="status"></div>
@@ -41,10 +40,8 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
     const eligibleRewards=rewards.filter(r=>String(r.customer_name||'').trim().toLocaleLowerCase('es-MX')!=='jorge chable');
     el('loyaltyRewards').innerHTML=eligibleRewards.length?eligibleRewards.map(r=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(r.customer_name)}</b> · ${escapeHtml(r.phone_masked)} · Ciclo ${Number(r.cycle_number)}<br>Estado: ${escapeHtml(r.status)} · ${new Date(r.earned_at).toLocaleDateString('es-MX')}${r.status==='pending'?` <button class="act ok" data-redeem="${escapeHtml(r.reward_id)}">Marcar sorpresa entregada</button>`:''}</div>`).join(''):'Todavía no hay premios generados.';
     el('loyaltyRewards').querySelectorAll('[data-redeem]').forEach(button=>button.addEventListener('click',async()=>{
-      const employee=el('loyaltyEmployee').value.trim();
-      if(!employee){el('loyaltyNotice').textContent='Escribe el nombre del empleado antes de entregar el premio.';return;}
       if(!confirm('¿Confirmas que la sorpresa especial ya fue entregada?'))return;
-      try{await rpc('barber_loyalty_redeem_reward',{p_token:token,p_reward_id:button.dataset.redeem,p_employee:employee});el('loyaltyNotice').textContent='Premio marcado como entregado. El siguiente ciclo comienza desde cero.';await refresh();}
+      try{await rpc('barber_loyalty_redeem_reward',{p_token:token,p_reward_id:button.dataset.redeem});el('loyaltyNotice').textContent='Premio marcado como entregado. El siguiente ciclo comienza desde cero.';await refresh();}
       catch(error){el('loyaltyNotice').textContent=error.message;}
     }));
   }
@@ -61,7 +58,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
     const saleId=Number(el('loyaltySaleId').value);
     if(!Number.isSafeInteger(saleId)||saleId<1){el('loyaltyNotice').textContent='Ingresa el ID de una venta ya cobrada.';return;}
     try{
-      const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:customer.customer_id,p_sale_id:saleId,p_employee:el('loyaltyEmployee').value.trim()});
+      const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:customer.customer_id,p_sale_id:saleId});
       el('loyaltyNotice').textContent=result.reward_earned?'🎉 ¡Quinta visita! Se generó una sorpresa especial pendiente.':result.already_recorded?'Esta venta ya estaba contabilizada; no se duplicó.':`Visita ${result.visit_number} de 5 registrada.`;
       await find();await refresh();
     }catch(e){el('loyaltyNotice').textContent=e.message;}
