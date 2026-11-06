@@ -18,7 +18,9 @@ const form=document.getElementById('form'),msg=document.getElementById('msg'),su
 function showMessage(text,error=false){msg.style.display='block';msg.className=error?'msg error':'msg';msg.textContent=text;}
 form.addEventListener('submit',async e=>{
  e.preventDefault();
- const apiUrl=window.ELEGANCE_LOYALTY_REGISTER_URL,key=window.ELEGANCE_SUPABASE_ANON_KEY;\n const turnstileToken=window.turnstile?.getResponse?.();\n if(!turnstileToken){showMessage('Completa la verificación de seguridad.',true);return;}
+ const apiUrl=window.ELEGANCE_LOYALTY_REGISTER_URL,key=window.ELEGANCE_SUPABASE_ANON_KEY;
+ const turnstileToken=window.turnstile?.getResponse?.();
+ if(!turnstileToken){showMessage('Completa la verificación de seguridad.',true);return;}
  if(!apiUrl||!key){showMessage('El registro no está configurado.',true);return;}
  submitBtn.disabled=true;showMessage('Enviando registro…');
  try{
