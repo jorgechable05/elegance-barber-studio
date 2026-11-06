@@ -1,7 +1,7 @@
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
   if(!root || typeof rpc!=='function' || !token) throw new Error('Falta sesión o conexión para fidelidad.');
-  const qrUrl = new URL('/fidelidad', location.origin).toString();
+  const qrUrl = `${window.location.origin}/fidelidad`;
   root.innerHTML = `
     <section style="background:#111;color:#f5f5f5;border:1px solid #39332a;border-radius:14px;padding:16px;margin:12px 0;font-family:Arial,sans-serif">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
