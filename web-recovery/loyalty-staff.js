@@ -5,7 +5,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
   root.innerHTML = `
     <section style="background:#111;color:#f5f5f5;border:1px solid #39332a;border-radius:14px;padding:16px;margin:12px 0;font-family:Arial,sans-serif">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
-        <div><h2 style="margin:0;color:#d4af37">Programa de fidelidad</h2><p style="color:#aaa;font-size:12px">Un solo QR para todos los clientes · 5 visitas = corte de cortesía</p></div>
+        <div><h2 style="margin:0;color:#d4af37">Programa de fidelidad</h2><p style="color:#aaa;font-size:12px">Un solo QR para todos los clientes · 5 visitas = sorpresa especial</p></div>
         <button id="loyaltyRefresh" class="btn gold">Actualizar clientes</button>
       </div>
       <div style="display:grid;grid-template-columns:180px minmax(220px,1fr);gap:16px;align-items:center;margin:12px 0">
@@ -41,7 +41,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
     el('loyaltyRewards').querySelectorAll('[data-redeem]').forEach(button=>button.addEventListener('click',async()=>{
       const employee=el('loyaltyEmployee').value.trim();
       if(!employee){el('loyaltyNotice').textContent='Escribe el nombre del empleado antes de entregar el premio.';return;}
-      if(!confirm('¿Confirmas que el corte de cortesía ya fue entregado?'))return;
+      if(!confirm('¿Confirmas que la sorpresa especial ya fue entregada?'))return;
       try{await rpc('barber_loyalty_redeem_reward',{p_token:token,p_reward_id:button.dataset.redeem,p_employee:employee});el('loyaltyNotice').textContent='Premio marcado como entregado. El siguiente ciclo comienza desde cero.';await refresh();}
       catch(error){el('loyaltyNotice').textContent=error.message;}
     }));
@@ -60,7 +60,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
     if(!Number.isSafeInteger(saleId)||saleId<1){el('loyaltyNotice').textContent='Ingresa el ID de una venta ya cobrada.';return;}
     try{
       const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:customer.customer_id,p_sale_id:saleId,p_employee:el('loyaltyEmployee').value.trim()});
-      el('loyaltyNotice').textContent=result.reward_earned?'🎉 ¡Quinta visita! Se generó un corte de cortesía pendiente.':result.already_recorded?'Esta venta ya estaba contabilizada; no se duplicó.':`Visita ${result.visit_number} de 5 registrada.`;
+      el('loyaltyNotice').textContent=result.reward_earned?'🎉 ¡Quinta visita! Se generó una sorpresa especial pendiente.':result.already_recorded?'Esta venta ya estaba contabilizada; no se duplicó.':`Visita ${result.visit_number} de 5 registrada.`;
       await find();await refresh();
     }catch(e){el('loyaltyNotice').textContent=e.message;}
   };
