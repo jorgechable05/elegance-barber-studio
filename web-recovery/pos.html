@@ -61,9 +61,162 @@ async function requestRefund(saleId){
  if(!['Efectivo','Transferencia','Tarjeta'].includes(method))return alert('Método no válido.');
  const reason=prompt('Motivo de la devolución (3 a 500 caracteres):');
  if(!reason||reason.trim().length<3)return alert('Debes indicar el motivo.');
+ if(!confirm('Se solicitará, autorizará y marcará como PAGADA una devolución de 
+  await rpc('barber_admin_pay_refund',{p_token:token,p_refund_id:request.refund_id});
+  alert('Devolución pagada y registrada. Folio de devolución: '+request.refund_id);
+  await load();
+ }catch(e){alert('No se pudo completar la devolución: '+e.message)}
+}
+async function load(){
+ if(!token)return;
+ try{
+  try{
+   const enriched=await rpc('barber_admin_reservations_with_promotions',{p_token:token});
+   reservas=Array.isArray(enriched)?enriched:(await rpc('barber_admin_reservations',{p_token:token})||[]);
+  }catch(_){reservas=await rpc('barber_admin_reservations',{p_token:token})||[]}
+  if(selected){
+   selected=reservas.find(r=>String(r.id)===String(selected.id))||null;
+   if(!selected){$('selected').textContent='Selecciona una reserva.';$('total').textContent='$0.00'}
+  }
+  render();
+  const sales=await rpc('barber_admin_sales',{p_token:token});
+  const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  $('sales').innerHTML=(sales||[]).map(x=>{
+   const payment=String(x.payment_status||'paid'),service=String(x.service_status||'pending');
+   const canRefund=['paid','partially_refunded'].includes(payment);
+   const canComplete=payment==='paid'&&service!=='completed';
+   return '<div class="sale"><b>'+safe(x.folio)+'</b> · '+safe(x.cliente)+' · '+safe(x.servicio)+
+    '<br><span class="muted">Cobro: '+safe(payment)+' · Servicio: '+safe(service)+' · Total: $'+Number(x.total||0).toFixed(2)+'</span>'+
+    (canComplete?'<br><button class="btn walkBtn" onclick="completeService('+Number(x.id)+')">Marcar servicio realizado</button>':'')+
+    (canRefund?'<button class="btn walkBtn" onclick="requestRefund('+Number(x.id)+')">Solicitar devolución</button>':'')+
+    '</div>';
+  }).join('')||'<div class="empty">No hay ventas registradas hoy.</div>';
+ }catch(e){console.error('Error al actualizar POS',e);$('sales').textContent='No se pudieron cargar las ventas.'}
+}
+async function completeService(saleId){if(!confirm('¿Confirmas que el servicio de esta venta ya fue realizado?'))return;try{await rpc('barber_admin_complete_service',{p_token:token,p_sale_id:Number(saleId),p_estado:'completed',p_reason:null});alert('Servicio marcado como realizado. Si corresponde, registra la visita en Fidelidad QR.');await load()}catch(e){alert(e.message)}}
+function mixedPaymentArgs(method,cashId,cardId,total){if(method!=='Mixto')return {};const cash=Number($(cashId).value),card=Number($(cardId).value),amount=Number(total);if(!Number.isFinite(cash)||!Number.isFinite(card)||cash<0||card<0||Math.round((cash+card)*100)!==Math.round(amount*100))throw Error('En pago mixto, efectivo + tarjeta debe ser igual al total.');return {p_efectivo:Number(cash.toFixed(2)),p_tarjeta:Number(card.toFixed(2))}}
+$('method').onchange=()=>{$('mixedFields').classList.toggle('active',$('method').value==='Mixto');$('received').style.display=$('method').value==='Mixto'?'none':'block'};$('wmethod').onchange=()=>{$('wmixedFields').classList.toggle('active',$('wmethod').value==='Mixto');$('wreceived').style.display=$('wmethod').value==='Mixto'?'none':'block'};
+$('charge').onclick=async()=>{
+ if(!selected)return alert('Selecciona una reserva.');
+ const method=$('method').value,received=Number($('received').value||selected.precio);
+ if(method==='Efectivo'&&received<Number(selected.precio))return alert('El efectivo recibido es insuficiente.');
+ try{
+  const info={...selected,metodo:method};
+  const mixed=mixedPaymentArgs(method,'cashPart','cardPart',selected.precio);
+  const isMixed=method==='Mixto';
+  const name=isMixed?'barber_admin_create_sale_with_promotion_info_mixed':'barber_admin_create_sale_with_promotion_info';
+  const args={p_token:token,p_reserva_id:selected.id,p_metodo:method,p_recibido:received,...(isMixed?mixed:{})};
+  const d=await rpc(name,args);
+  $('change').textContent='Cambio: $'+Number(d.cambio||0).toFixed(2);
+  printTicket({...info,...d,total:Number(d.total??selected.precio),...(isMixed?{efectivo:mixed.p_efectivo,tarjeta:mixed.p_tarjeta}:{})});
+  selected=null;$('selected').textContent='Selecciona una reserva.';$('total').textContent='$0.00';
+  $('received').value='';$('cashPart').value='';$('cardPart').value='';await load()
+ }catch(e){alert(e.message)}
+};
+async function loadWalkinServices(){
+ const select=$('wservice'),previous=String(select.value||'');
+ try{
+  const rows=await rpc('barber_services_public',{});
+  if(Array.isArray(rows)&&rows.length){
+   select.replaceChildren();
+   for(const s of rows){
+    const option=document.createElement('option');
+    option.value=String(s.id);option.dataset.price=String(Number(s.price)||0);
+    option.textContent=String(s.name)+' — $'+Number(s.price||0).toFixed(2);
+    select.append(option);
+   }
+   if(rows.some(s=>String(s.id)===previous))select.value=previous;
+   else select.selectedIndex=0;
+  }
+ }catch(error){console.warn('No se pudo actualizar el catálogo del POS; se conserva el catálogo local.',error)}
+ await loadWalkinPromotions();
+}
+function parseClockMinutes(value){
+ const m=/^(\d{2}):(\d{2})(?::\d{2})?$/.exec(String(value||''));if(!m)return null;
+ const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?h*60+min:null;
+}
+function localPromotionTime(date){
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Merida',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).map(x=>[x.type,x.value]));
+ const days={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+ return {weekday:days[parts.weekday],minutes:Number(parts.hour)*60+Number(parts.minute)};
+}
+function walkinPromotionPrice(promo,base){
+ if(!promo)return {subtotal:base,discount:0,total:base,promo:null};
+ let total=base;
+ if(promo.discount_type==='percent')total=Math.round(base*(1-Number(promo.discount_value)/100)*100)/100;
+ else if(promo.discount_type==='fixed_price')total=Number(promo.discount_value);
+ if(!Number.isFinite(total)||total<0||total>base)return {subtotal:base,discount:0,total:base,promo:null};
+ return {subtotal:base,discount:Math.round((base-total)*100)/100,total:Math.round(total*100)/100,promo};
+}
+function selectedWalkinPricing(){
+ const option=$('wservice').selectedOptions[0],base=Number(option?.dataset.price||0),promo=walkinPromotions.find(p=>String(p.id)===$('wpromotion').value)||null;
+ return walkinPromotionPrice(promo,base);
+}
+function renderWalkinPromotionSummary(){
+ const pricing=selectedWalkinPricing();
+ $('wpromoSummary').textContent=pricing.promo?
+  pricing.promo.title+': Subtotal $'+pricing.subtotal.toFixed(2)+' · Descuento -$'+pricing.discount.toFixed(2)+' · Total $'+pricing.total.toFixed(2):
+  'Subtotal $'+pricing.subtotal.toFixed(2)+' · Sin descuento · Total $'+pricing.total.toFixed(2);
+}
+async function loadWalkinPromotions(){
+ const select=$('wpromotion'),serviceId=String($('wservice').value),current=new Date(),local=localPromotionTime(current);
+ select.replaceChildren();
+ const none=document.createElement('option');none.value='';none.textContent='Sin promoción';select.append(none);
+ walkinPromotions=[];
+ try{
+  const rows=await rpc('barber_promotions_public',{});
+  for(const p of (Array.isArray(rows)?rows:[])){
+   if(!(p.service_ids||[]).map(String).includes(serviceId))continue;
+   if(current<new Date(p.starts_at)||current>=new Date(p.ends_at))continue;
+   if(Array.isArray(p.weekdays)&&p.weekdays.length&&!p.weekdays.map(Number).includes(local.weekday))continue;
+   if(p.start_time||p.end_time){
+    const start=parseClockMinutes(p.start_time),end=parseClockMinutes(p.end_time);
+    if(start==null||end==null||end<=start||local.minutes<start||local.minutes>=end)continue;
+   }
+   const base=Number($('wservice').selectedOptions[0]?.dataset.price||0),pricing=walkinPromotionPrice(p,base);
+   if(pricing.discount<=0)continue;
+   walkinPromotions.push(p);
+   const option=document.createElement('option');option.value=p.id;
+   option.textContent=p.title+' — $'+pricing.total.toFixed(2);select.append(option);
+  }
+ }catch(error){console.warn('No se pudieron consultar promociones para POS',error)}
+ renderWalkinPromotionSummary();
+}
+async function walkinCharge(){
+ const nombre=$('wname').value.trim()||'Cliente mostrador';
+ const telefono=$('wphone').value.trim();
+ const service=$('wservice').selectedOptions[0],sid=Number($('wservice').value),barberId=Number($('wbarber').value),method=$('wmethod').value;
+ const pricing=selectedWalkinPricing(),received=Number($('wreceived').value||pricing.total);
+ if(method==='Efectivo'&&received<pricing.total)return alert('El efectivo recibido es insuficiente.');
+ try{
+  const mixed=mixedPaymentArgs(method,'wcashPart','wcardPart',pricing.total),isMixed=method==='Mixto';
+  const sale=await rpc('barber_admin_create_walkin_sale_with_promotion',{
+   p_token:token,p_cliente:nombre,p_servicio_id:sid,p_barbero_id:barberId,p_metodo:method,
+   p_recibido:received,p_efectivo:isMixed?mixed.p_efectivo:null,p_tarjeta:isMixed?mixed.p_tarjeta:null,
+   p_promotion_id:pricing.promo?pricing.promo.id:null
+  });
+  $('walkinModal').style.display='none';$('wname').value='';$('wphone').value='';$('wreceived').value='';$('wcashPart').value='';$('wcardPart').value='';
+  printTicket({...sale,total:Number(sale.total??pricing.total)});await load()
+ }catch(e){alert(e.message)}
+}
+$('openWalkin').onclick=()=>{$('walkinModal').style.display='grid';loadWalkinServices()};$('closeWalkin').onclick=()=>{$('walkinModal').style.display='none'};$('walkCharge').onclick=walkinCharge;$('wservice').addEventListener('change',loadWalkinPromotions);$('wpromotion').addEventListener('change',renderWalkinPromotionSummary);
+window.completeService=completeService;window.requestRefund=requestRefund;window.__elegancePosBridge={rpc,getToken:()=>token};
+function openApp(){$('login').style.display='none';$('app').style.display='block';load()}const saved=sessionStorage.getItem('pos_token');if(saved){token=saved;openApp()}setInterval(()=>{if(token)load()},5000);
+</script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script type="module">
+import {mountLoyaltyStaff} from './loyalty-staff.js';
+let mounted=false;
+document.getElementById('loyaltyToggle').addEventListener('click',()=>{
+ const bridge=window.__elegancePosBridge;
+ if(!bridge||!bridge.getToken()){alert('Inicia sesión en POS para consultar fidelidad.');return;}
+ document.querySelector('.grid').style.display='none';document.getElementById('loyaltyPanel').style.display='block';
+ if(!mounted){mountLoyaltyStaff({root:document.getElementById('loyaltyRoot'),rpc:bridge.rpc,token:bridge.getToken(),role:'pos'});mounted=true;}
+});
+document.getElementById('backFromLoyalty').addEventListener('click',()=>{document.getElementById('loyaltyPanel').style.display='none';document.querySelector('.grid').style.display='grid';});
+</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(e=>console.warn('PWA SW',e)));}</script>
+</body></html>
++amount.toFixed(2)+' mediante '+method+'. ¿Confirmas?'))return;
  try{
   const request=await rpc('barber_admin_request_refund',{p_token:token,p_sale_id:Number(saleId),p_amount:amount,p_refund_method:method,p_reason:reason.trim()});
-  if(!confirm('Devolución solicitada por $'+amount.toFixed(2)+'. ¿La autorizas y confirmas como pagada?')){alert('La solicitud quedó pendiente de revisión.');await load();return;}
   await rpc('barber_admin_review_refund',{p_token:token,p_refund_id:request.refund_id,p_decision:'approved',p_reason:null});
   await rpc('barber_admin_pay_refund',{p_token:token,p_refund_id:request.refund_id});
   alert('Devolución pagada y registrada. Folio de devolución: '+request.refund_id);
