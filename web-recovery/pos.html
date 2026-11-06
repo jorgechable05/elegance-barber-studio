@@ -20,15 +20,11 @@ async function rpc(name,args){
  return d;
 }
 async function creditLoyaltyVisit(phone,saleId,employee){
- if(!phone||!saleId)return null;
- try{
-  const rows=await rpc('barber_loyalty_lookup_customer',{p_token:token,p_phone:phone});
-  if(!rows||!rows.length)return null;
-  const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:rows[0].customer_id,p_sale_id:Number(saleId),p_employee:employee||'POS'});
-  if(result.reward_earned)alert('🎉 ¡Quinta visita! Se generó una sorpresa especial pendiente para '+rows[0].full_name+'.');
-  else if(!result.already_recorded)console.info('Visita de fidelidad registrada:',result.visit_number+'/5');
-  return result;
- }catch(error){console.warn('No se pudo registrar la visita de fidelidad; la venta quedó cobrada:',error);return null;}
+ if(!phone||!saleId)return {skipped:true};
+ const rows=await rpc('barber_loyalty_lookup_customer',{p_token:token,p_phone:phone});
+ if(!rows||!rows.length)return {notFound:true};
+ const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:rows[0].customer_id,p_sale_id:Number(saleId),p_employee:employee||'POS'});
+ return {...result,customerName:rows[0].full_name};
 }
 async function login(){try{const d=await rpc('barber_admin_login',{p_username:$('u').value.trim(),p_password:$('p').value});token=d.token;sessionStorage.setItem('pos_token',token);openApp()}catch(e){$('err').textContent=e.message}}$('go').onclick=login;$('p').onkeydown=e=>{if(e.key==='Enter')login()};$('out').onclick=()=>{sessionStorage.removeItem('pos_token');location.reload()};
 function render(){const list=reservas.filter(r=>['confirmada','en_servicio'].includes(r.estado));$('reservas').innerHTML=list.length?list.map(r=>'<div class="res '+(selected&&selected.id===r.id?'active':'')+'" onclick="pick(\''+r.id+'\')"><div class="row"><b>'+r.nombre+'</b><span class="badge">'+r.estado.toUpperCase()+'</span></div><div class="muted">🕐 '+r.hora+' · 💈 '+r.barbero+'</div><div class="muted">✂️ '+r.servicio+'</div><div class="row" style="margin-top:6px"><span>Folio #'+r.id+'</span><span class="price">$'+r.precio+'</span></div></div>').join(''):'<div class="empty">No hay reservas listas para cobrar.</div>'}
@@ -96,7 +92,25 @@ async function load(){
   }).join('')||'<div class="empty">No hay ventas registradas hoy.</div>';
  }catch(e){console.error('Error al actualizar POS',e);$('sales').textContent='No se pudieron cargar las ventas.'}
 }
-async function completeService(saleId){if(!confirm('¿Confirmas que el servicio de esta venta ya fue realizado?'))return;try{await rpc('barber_admin_complete_service',{p_token:token,p_sale_id:Number(saleId),p_estado:'completed',p_reason:null});alert('Servicio marcado como realizado. Si corresponde, registra la visita en Fidelidad QR.');await load()}catch(e){alert(e.message)}}
+async function completeService(saleId){
+ if(!confirm('¿Confirmas que el servicio de esta venta ya fue realizado?'))return;
+ try{
+  await rpc('barber_admin_complete_service',{p_token:token,p_sale_id:Number(saleId),p_estado:'completed',p_reason:null});
+  const phone=prompt('Servicio completado.\n\nSi el cliente participa en Fidelidad QR, escribe su teléfono registrado para acreditar esta visita.\n\nDéjalo vacío si no participa:');
+  if(phone===null||!phone.trim()){
+   alert('Servicio completado. No se acreditó visita porque no se proporcionó un teléfono de fidelidad.');
+  }else{
+   try{
+    const credit=await creditLoyaltyVisit(phone,saleId,'POS');
+    if(credit.notFound)alert('Servicio completado. No encontramos un cliente de fidelidad con ese teléfono; debe registrarse con el QR antes de acreditar visitas.');
+    else if(credit.reward_earned)alert('🎉 ¡Quinta visita! Se generó una sorpresa especial pendiente para '+credit.customerName+'.');
+    else if(credit.already_recorded)alert('Servicio completado. Esta venta ya tenía su visita registrada; no se duplicó.');
+    else alert('Servicio completado y visita '+credit.visit_number+'/5 acreditada a '+credit.customerName+'.');
+   }catch(creditError){alert('El servicio quedó completado, pero no se pudo acreditar la visita: '+creditError.message+'. Puedes reintentar desde Fidelidad QR con el mismo folio; el sistema evita duplicados.');}
+  }
+  await load();
+ }catch(e){alert(e.message)}
+}
 function mixedPaymentArgs(method,cashId,cardId,total){if(method!=='Mixto')return {};const cash=Number($(cashId).value),card=Number($(cardId).value),amount=Number(total);if(!Number.isFinite(cash)||!Number.isFinite(card)||cash<0||card<0||Math.round((cash+card)*100)!==Math.round(amount*100))throw Error('En pago mixto, efectivo + tarjeta debe ser igual al total.');return {p_efectivo:Number(cash.toFixed(2)),p_tarjeta:Number(card.toFixed(2))}}
 $('method').onchange=()=>{$('mixedFields').classList.toggle('active',$('method').value==='Mixto');$('received').style.display=$('method').value==='Mixto'?'none':'block'};$('wmethod').onchange=()=>{$('wmixedFields').classList.toggle('active',$('wmethod').value==='Mixto');$('wreceived').style.display=$('wmethod').value==='Mixto'?'none':'block'};
 $('charge').onclick=async()=>{
