@@ -61,7 +61,10 @@ async function requestRefund(saleId){
  if(!['Efectivo','Transferencia','Tarjeta'].includes(method))return alert('Método no válido.');
  const reason=prompt('Motivo de la devolución (3 a 500 caracteres):');
  if(!reason||reason.trim().length<3)return alert('Debes indicar el motivo.');
- if(!confirm('Se solicitará, autorizará y marcará como PAGADA una devolución de 
+ if(!confirm('Se solicitará, autorizará y marcará como PAGADA una devolución de $'+amount.toFixed(2)+' mediante '+method+'. ¿Confirmas?'))return;
+ try{
+  const request=await rpc('barber_admin_request_refund',{p_token:token,p_sale_id:Number(saleId),p_amount:amount,p_refund_method:method,p_reason:reason.trim()});
+  await rpc('barber_admin_review_refund',{p_token:token,p_refund_id:request.refund_id,p_decision:'approved',p_reason:null});
   await rpc('barber_admin_pay_refund',{p_token:token,p_refund_id:request.refund_id});
   alert('Devolución pagada y registrada. Folio de devolución: '+request.refund_id);
   await load();
