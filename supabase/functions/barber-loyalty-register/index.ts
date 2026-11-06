@@ -31,18 +31,18 @@ Deno.serve(async (req: Request) => {
   if (origin && !allowedOrigins.has(origin)) return response(403, { error: "Origin not allowed" }, null);
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const turnstileSecret = Deno.env.get("CLOUDFLARE_TURNSTILE_SECRET");
-  if (!supabaseUrl || !serviceKey || !turnstileSecret) {
-    return response(503, { error: "La protección anti-bots aún no está configurada." }, origin);
+  if (!supabaseUrl || !serviceKey) {
+    return response(503, { error: "El servicio de registro no está configurado." }, origin);
   }
   try {
     const body = await req.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const phone = typeof body.phone === "string" ? body.phone : "";
     const consent = body.consent === true;
-    const captchaToken = typeof body.captchaToken === "string" ? body.captchaToken : "";
-    if (name.length < 2 || name.length > 100 || phone.length < 8 || phone.length > 18 || !consent || !captchaToken) {
-      return response(400, { error: "Completa los datos, acepta el aviso y verifica el control anti-bots." }, origin);
+    const honeypot = typeof body.website === "string" ? body.website.trim() : "";
+    if (honeypot) return response(200, { message: "Registro recibido." }, origin);
+    if (name.length < 2 || name.length > 100 || phone.length < 8 || phone.length > 18 || !consent) {
+      return response(400, { error: "Completa tus datos y acepta el aviso de privacidad." }, origin);
     }
     const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip");
     if (!ip) return response(400, { error: "No se pudo validar el origen de la solicitud." }, origin);
@@ -52,13 +52,6 @@ Deno.serve(async (req: Request) => {
     });
     if (!rate.ok) return response(503, { error: "No se pudo validar el límite de registros. Intenta más tarde." }, origin);
     if (await rate.json() !== true) return response(429, { error: "Has alcanzado el límite de registros. Intenta de nuevo más tarde." }, origin);
-    const form = new FormData();
-    form.append("secret", turnstileSecret);
-    form.append("response", captchaToken);
-    form.append("remoteip", ip.trim());
-    const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-    const verdict = await verification.json();
-    if (!verdict.success) return response(403, { error: "No se pudo verificar el control anti-bots. Intenta nuevamente." }, origin);
     const registration = await fetch(supabaseUrl + "/rest/v1/rpc/barber_loyalty_register_customer", {
       method: "POST", headers,
       body: JSON.stringify({ p_name: name, p_phone: phone, p_consent: consent }),
