@@ -1,5 +1,4 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#080808"><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script><title>Fidelidad | Elegance Barber</title>
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#080808;color:#f5f5f5;font-family:Arial,sans-serif;display:grid;place-items:center;padding:20px}.card{width:min(460px,100%);background:#151515;border:1px solid #34302a;border-radius:20px;padding:26px;box-shadow:0 18px 70px #000}.brand{text-align:center;color:#d4af37;font:700 28px Georgia,serif}.sub{text-align:center;color:#999;font-size:11px;letter-spacing:2px;margin:8px 0 24px}.intro{text-align:center;color:#ddd;line-height:1.5}.input{width:100%;padding:14px;margin:7px 0;background:#090909;color:#fff;border:1px solid #444;border-radius:9px;font-size:16px}.consent{display:flex;gap:10px;align-items:flex-start;color:#bbb;font-size:12px;line-height:1.45;margin:12px 0}.btn{width:100%;padding:14px;background:#d4af37;color:#080808;border:0;border-radius:10px;font-weight:700;cursor:pointer}.note{color:#999;font-size:11px;line-height:1.5;margin-top:15px}.msg{margin-top:15px;padding:12px;border-radius:9px;background:#242016;color:#f3d98a;line-height:1.45;display:none}.error{background:#351a1a;color:#ffb4b4}.trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
 </style></head><body><main class="card"><div class="brand">ELEGANCE BARBER</div><div class="sub">PROGRAMA DE FIDELIDAD · PISTÉ</div>
@@ -8,7 +7,6 @@
 <label for="phone">Teléfono con lada</label><input id="phone" class="input" type="tel" inputmode="tel" autocomplete="tel" maxlength="18" required placeholder="Ej. 9991234567">
 <label class="consent"><input id="consent" type="checkbox" required><span>He leído y acepto el <a href="/privacidad" target="_blank" rel="noopener">aviso de privacidad</a> y autorizo el uso de mis datos para administrar el programa de fidelidad.</span></label>
 <div class="trap" aria-hidden="true"><label for="website">Deja este campo vacío</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
-<div class="cf-turnstile" data-sitekey="0x4AAAAAAFy0wmUuk1K7fAWI" data-theme="dark"></div><button id="submitBtn" class="btn" type="submit">REGISTRARME</button></form>
 <div id="msg" class="msg" role="status"></div>
 <p class="note">Este QR es el mismo para todos los clientes. Escanearlo no suma una visita. El personal confirmará cada visita después de completar tu servicio. Al llegar a cinco visitas confirmadas recibirás una sorpresa especial por parte de la barbería. No compartas tu número con otras personas para registrar visitas.</p>
 </main>
@@ -19,16 +17,14 @@ function showMessage(text,error=false){msg.style.display='block';msg.className=e
 form.addEventListener('submit',async e=>{
  e.preventDefault();
  const apiUrl=window.ELEGANCE_LOYALTY_REGISTER_URL,key=window.ELEGANCE_SUPABASE_ANON_KEY;
- const turnstileToken=window.turnstile?.getResponse?.();
- if(!turnstileToken){showMessage('Completa la verificación de seguridad.',true);return;}
  if(!apiUrl||!key){showMessage('El registro no está configurado.',true);return;}
  submitBtn.disabled=true;showMessage('Enviando registro…');
  try{
-  const response=await fetch(apiUrl,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('name').value.trim(),phone:document.getElementById('phone').value,consent:document.getElementById('consent').checked,website:document.getElementById('website').value,turnstileToken})});
+  const response=await fetch(apiUrl,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('name').value.trim(),phone:document.getElementById('phone').value,consent:document.getElementById('consent').checked,website:document.getElementById('website').value})});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||'No se pudo completar el registro.');
   showMessage(data.message||'Registro recibido. Gracias por formar parte de Elegance Barber.');
-  form.reset();window.turnstile?.reset?.();
+  form.reset();
  }catch(err){showMessage(err.message||'No se pudo completar el registro. Intenta nuevamente.',true);}
  finally{submitBtn.disabled=false;}
 });
