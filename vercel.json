@@ -1,0 +1,43 @@
+{
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/web-recovery/admin.html"
+    },
+    {
+      "source": "/cliente",
+      "destination": "/web-recovery/cliente.html"
+    },
+    {
+      "source": "/pos",
+      "destination": "/web-recovery/pos.html"
+    },
+    {
+      "source": "/fidelidad",
+      "destination": "/web-recovery/fidelidad.html"
+    },
+    {
+      "source": "/privacidad",
+      "destination": "/web-recovery/privacidad.html"
+    },
+    {
+      "source": "/",
+      "destination": "/preview.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ]
+}
