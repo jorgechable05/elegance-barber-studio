@@ -3,13 +3,13 @@ on:
   push:
     branches: [feat/lealtad-qr-clientes]
     paths:
-      - 'supabase/migrations/20261103_loyalty_*.sql'
+      - 'supabase/migrations/*loyalty*.sql'
       - 'supabase/tests/loyalty-qr-contract.sql'
       - '.github/workflows/loyalty-qr-isolated-tests.yml'
   pull_request:
     branches: [main, feat/servicios-promociones-web]
     paths:
-      - 'supabase/migrations/20261103_loyalty_*.sql'
+      - 'supabase/migrations/*loyalty*.sql'
       - 'supabase/tests/loyalty-qr-contract.sql'
       - '.github/workflows/loyalty-qr-isolated-tests.yml'
 jobs:
