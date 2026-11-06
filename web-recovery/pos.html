@@ -25,7 +25,7 @@ async function creditLoyaltyVisit(phone,saleId,employee){
   const rows=await rpc('barber_loyalty_lookup_customer',{p_token:token,p_phone:phone});
   if(!rows||!rows.length)return null;
   const result=await rpc('barber_loyalty_record_visit',{p_token:token,p_customer_id:rows[0].customer_id,p_sale_id:Number(saleId),p_employee:employee||'POS'});
-  if(result.reward_earned)alert('🎉 ¡Quinta visita! Se generó un corte de cortesía pendiente para '+rows[0].full_name+'.');
+  if(result.reward_earned)alert('🎉 ¡Quinta visita! Se generó una sorpresa especial pendiente para '+rows[0].full_name+'.');
   else if(!result.already_recorded)console.info('Visita de fidelidad registrada:',result.visit_number+'/5');
   return result;
  }catch(error){console.warn('No se pudo registrar la visita de fidelidad; la venta quedó cobrada:',error);return null;}
