@@ -4,6 +4,7 @@ const cors = {
   "Content-Type": "application/json",
 };
 const allowedOrigins = new Set([
+  "https://elegance-barber-piste-ppiv1pp96-dell-723c.vercel.app",
   "https://elegance-barber-piste-6mexwt17r-dell-723c.vercel.app",
   "https://elegance-barber-piste-2r1trtfud-dell-723c.vercel.app",
   "https://elegance-barber-piste-lmmazprne-dell-723c.vercel.app",
