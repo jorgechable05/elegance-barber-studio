@@ -35,9 +35,11 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
   el('loyaltyCopy').onclick=async()=>{try{await navigator.clipboard.writeText(qrUrl);el('loyaltyNotice').textContent='Enlace copiado.';}catch{el('loyaltyNotice').textContent=qrUrl;}};
   async function refresh(){
     const rows=await rpc('barber_loyalty_list_customers',{p_token:token});
-    el('loyaltyList').innerHTML=rows.length?rows.map(c=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(c.full_name)}</b> · ${escapeHtml(c.phone_masked)}<br>Visitas del ciclo: ${Number(c.visits_in_cycle)}/5 · Premios pendientes: ${Number(c.pending_rewards)} · Visitas históricas: ${Number(c.total_visits)}</div>`).join(''):'Todavía no hay clientes registrados.';
+    const eligibleRows=rows.filter(c=>String(c.full_name||'').trim().toLocaleLowerCase('es-MX')!=='jorge chable');
+    el('loyaltyList').innerHTML=eligibleRows.length?eligibleRows.map(c=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(c.full_name)}</b> · ${escapeHtml(c.phone_masked)}<br>Visitas del ciclo: ${Number(c.visits_in_cycle)}/5 · Premios pendientes: ${Number(c.pending_rewards)} · Visitas históricas: ${Number(c.total_visits)}</div>`).join(''):'Todavía no hay clientes registrados.';
     const rewards=await rpc('barber_loyalty_list_rewards',{p_token:token});
-    el('loyaltyRewards').innerHTML=rewards.length?rewards.map(r=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(r.customer_name)}</b> · ${escapeHtml(r.phone_masked)} · Ciclo ${Number(r.cycle_number)}<br>Estado: ${escapeHtml(r.status)} · ${new Date(r.earned_at).toLocaleDateString('es-MX')}${r.status==='pending'?` <button class="act ok" data-redeem="${escapeHtml(r.reward_id)}">Marcar sorpresa entregada</button>`:''}</div>`).join(''):'Todavía no hay premios generados.';
+    const eligibleRewards=rewards.filter(r=>String(r.customer_name||'').trim().toLocaleLowerCase('es-MX')!=='jorge chable');
+    el('loyaltyRewards').innerHTML=eligibleRewards.length?eligibleRewards.map(r=>`<div style="padding:9px;border-bottom:1px solid #333"><b>${escapeHtml(r.customer_name)}</b> · ${escapeHtml(r.phone_masked)} · Ciclo ${Number(r.cycle_number)}<br>Estado: ${escapeHtml(r.status)} · ${new Date(r.earned_at).toLocaleDateString('es-MX')}${r.status==='pending'?` <button class="act ok" data-redeem="${escapeHtml(r.reward_id)}">Marcar sorpresa entregada</button>`:''}</div>`).join(''):'Todavía no hay premios generados.';
     el('loyaltyRewards').querySelectorAll('[data-redeem]').forEach(button=>button.addEventListener('click',async()=>{
       const employee=el('loyaltyEmployee').value.trim();
       if(!employee){el('loyaltyNotice').textContent='Escribe el nombre del empleado antes de entregar el premio.';return;}
@@ -48,7 +50,7 @@ export function mountLoyaltyStaff({root,rpc,token,role='staff'}) {
   }
   async function find(){
     const rows=await rpc('barber_loyalty_lookup_customer',{p_token:token,p_phone:el('loyaltyPhone').value});
-    customer=rows?.[0]||null;
+    customer=rows?.find(c=>String(c.full_name||'').trim().toLocaleLowerCase('es-MX')!=='jorge chable')||null;
     if(!customer){el('loyaltyCustomer').textContent='No encontramos ese teléfono. El cliente debe registrarse escaneando el QR único.';el('loyaltyRecord').disabled=true;return;}
     el('loyaltyCustomer').innerHTML=`<b>${escapeHtml(customer.full_name)}</b> · ${escapeHtml(customer.phone_masked)}<br>Progreso del ciclo ${Number(customer.cycle_number)}: <b>${Number(customer.visits_in_cycle)}/5</b> · Premios pendientes: ${Number(customer.pending_rewards)}`;
     el('loyaltyRecord').disabled=false;
